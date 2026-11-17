@@ -1,0 +1,6 @@
+# Local credentials and persistent user data must never be committed.
+config/users
+data/
+.env
+*.log
+.DS_Store
