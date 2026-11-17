@@ -1,0 +1,11 @@
+name: cal45
+
+services:
+  radicale:
+    image: ghcr.io/kozea/radicale:stable
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5232:5232"
+    volumes:
+      - ./config:/etc/radicale:ro
+      - ./data:/var/lib/radicale
