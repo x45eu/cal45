@@ -160,8 +160,11 @@ internal object DavFieldPatch {
             } else if (field.substringBefore(';').equals(target.property, true)) {
                 return Result.Rejected("Parameterized target property")
             }
-            if (target.inner != null && field.equals("RRULE", true))
-                return Result.Rejected("Recurring event")
+            if (target.inner != null &&
+                field.substringBefore(';').uppercase() in setOf(
+                    "RRULE", "RDATE", "EXDATE", "RECURRENCE-ID", "DURATION", "STATUS"
+                )
+            ) return Result.Rejected("Complex or special event")
         }
         if (stack.isNotEmpty() || outerCount != 1 ||
             (target.inner != null && innerCount != 1))
@@ -172,6 +175,10 @@ internal object DavFieldPatch {
         if (decoded != expectedOldValue) return Result.Rejected("Old value changed")
         if (newValue == expectedOldValue) return Result.Rejected("No change")
         val replacement = target.property + ":" + escapeText(newValue)
+        // This editor does not implement UTF-8 line folding. Restrict the
+        // replacement to one RFC5545-compatible short content line.
+        if (replacement.toByteArray(Charsets.UTF_8).size > 75)
+            return Result.Rejected("New field requires line folding")
         val output = buildString(original.length + 300) {
             for ((index, line) in lines.withIndex()) {
                 append(if (index == targetIndex) replacement else line.content)
