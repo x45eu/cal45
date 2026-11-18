@@ -1,6 +1,7 @@
 package eu.x45.cal45.sync
 
-import android.app.Activity
+import android.accounts.AccountAuthenticatorActivity
+import android.accounts.AccountManager
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -16,10 +17,10 @@ import kotlin.concurrent.thread
 
 /**
  * Cal45 Sync credential enrollment, no calendar/contact sync yet.
- * Supports existing DAV user credentials; dedicated app passwords will
- * be issued by Cal45 server once its account management is implemented.
+ * Requires separate Cal45 device app passwords and HTTPS DNS server URLs.
+ * Registers an Android system account but does not sync contacts/calendars yet.
  */
-class MainActivity : Activity() {
+class MainActivity : AccountAuthenticatorActivity() {
     private val navy = Color.rgb(25, 34, 44)
     private val panel = Color.rgb(34, 48, 63)
     private val light = Color.rgb(212, 219, 229)
@@ -43,6 +44,14 @@ class MainActivity : Activity() {
         // Discard credentials saved by older builds that accepted account passwords.
         if (vault.configured() && !DavProbe.looksLikeAppPassword(vault.readAppPassword() ?: "")) {
             vault.remove()
+            Cal45SystemAccount.remove(this)
+        }
+        if (vault.configured()) {
+            try {
+                Cal45SystemAccount.enroll(this, vault.server(), vault.username())
+            } catch (_: Exception) {
+                // Re-enrollment remains possible by testing the DAV login again.
+            }
         }
         val scroll = ScrollView(this).apply { setBackgroundColor(navy) }
         val root = LinearLayout(this).apply {
@@ -132,7 +141,20 @@ class MainActivity : Activity() {
                 } else result.message
                 runOnUiThread {
                     status.text = message
-                    if (result.successful && message.contains("gespeichert")) appPassword.text.clear()
+                    if (result.successful && message.contains("gespeichert")) {
+                        appPassword.text.clear()
+                        try {
+                            val account = Cal45SystemAccount.enroll(this,
+                                DavProbe.normalizedUrl(url)!!, user)
+                            setAccountAuthenticatorResult(Bundle().apply {
+                                putString(AccountManager.KEY_ACCOUNT_NAME, account.name)
+                                putString(AccountManager.KEY_ACCOUNT_TYPE, account.type)
+                            })
+                            status.text = message + " Android-Systemkonto eingerichtet (Synchronisierung folgt)."
+                        } catch (_: Exception) {
+                            status.text = message + " Das Android-Systemkonto konnte noch nicht eingerichtet werden."
+                        }
+                    }
                     check.isEnabled = true
                 }
             }
@@ -145,6 +167,7 @@ class MainActivity : Activity() {
         }
         panelView.addView(forget)
         forget.setOnClickListener {
+            Cal45SystemAccount.remove(this)
             vault.remove()
             server.text.clear()
             username.text.clear()
@@ -158,8 +181,8 @@ class MainActivity : Activity() {
         root.addView(text("✓  Native Android-App ohne Google Play Services\\n\\n" +
             "✓  HTTPS-DAV-Prüfung nur mit Domainnamen\\n\\n" +
             "✓  Lokale Token-Formatprüfung und Android-Keystore-Speicherung\\n\\n" +
-            "○  Serverseitige App-Passwort-Erkennung: noch offen\\n\\n" +
-            "○  Android-Systemkonto: noch offen\\n\\n" +
+            "✓  Serverseitige App-Passwort-Prüfung über Cal45-Gateway\\n\\n" +
+            "✓  Android-Systemkonto (ohne SyncAdapter)\\n\\n" +
             "○  Kontakte-Synchronisierung: noch offen\\n\\n" +
             "○  Kalender-Synchronisierung: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
