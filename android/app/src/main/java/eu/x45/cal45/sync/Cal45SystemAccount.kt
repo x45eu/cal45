@@ -14,7 +14,8 @@ import java.util.Locale
  * Registers a visible Cal45 Android system account. No app password or
  * authentication token is ever stored in Android's AccountManager.
  *
- * This is not a SyncAdapter; calendar/contact syncing remains forthcoming.
+ * The associated SyncAdapters are registered separately; this account never
+ * exposes its device password to other applications.
  * Initial implementation supports a single Cal45 account per installation,
  * matching CredentialVault's current one-account storage model.
  */
@@ -33,7 +34,11 @@ object Cal45SystemAccount {
         val account = Account(accountName(server, username), TYPE)
         // One system account only until multi-account credential storage exists.
         for (existing in manager.getAccountsByType(TYPE)) {
-            if (existing.name != account.name) manager.removeAccountExplicitly(existing)
+            if (existing.name != account.name) {
+                // Remove private journal records belonging to the old account.
+                SyncJournalStore(context, existing.name).discard()
+                manager.removeAccountExplicitly(existing)
+            }
         }
         val present = manager.getAccountsByType(TYPE).any { it.name == account.name }
         if (!present) {
@@ -44,9 +49,13 @@ object Cal45SystemAccount {
             manager.setUserData(account, "server", server)
         }
         ContentResolver.setIsSyncable(account, ContactsContract.AUTHORITY, 1)
-        ContentResolver.setSyncAutomatically(account, ContactsContract.AUTHORITY, false)
         ContentResolver.setIsSyncable(account, CalendarContract.AUTHORITY, 1)
-        ContentResolver.setSyncAutomatically(account, CalendarContract.AUTHORITY, false)
+        if (!present) {
+            // Never reset a user's existing automatic-sync setting when they
+            // refresh a device password or reconnect the same account.
+            ContentResolver.setSyncAutomatically(account, ContactsContract.AUTHORITY, false)
+            ContentResolver.setSyncAutomatically(account, CalendarContract.AUTHORITY, false)
+        }
         return account
     }
 
