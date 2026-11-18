@@ -4,3 +4,11 @@ data/
 .env
 *.log
 .DS_Store
+
+# Android / Gradle generated files, secrets and local config
+.gradle/
+**/build/
+android/local.properties
+*.keystore
+*.jks
+*.apk
