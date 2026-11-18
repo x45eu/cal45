@@ -210,6 +210,18 @@ class MainActivity : AccountAuthenticatorActivity() {
             }
         }
 
+        val lastImport = Button(this).apply {
+            text = "Letzten Kontakte-Import prüfen"
+            isAllCaps = false
+            setTextColor(light)
+        }
+        panelView.addView(lastImport)
+        lastImport.setOnClickListener {
+            val prefs = getSharedPreferences("cal45_contact_sync_status", MODE_PRIVATE)
+            status.text = prefs.getString("message", null)
+                ?: "Es liegt noch kein abgeschlossener Kontakte-Import vor."
+        }
+
         val forget = Button(this).apply {
             text = "Gespeichertes Konto entfernen"
             isAllCaps = false
