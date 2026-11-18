@@ -80,4 +80,39 @@ class ICalendarEventTest {
         assertNull(ICalendarEvent.parse(duplicate))
         assertNull(ICalendarEvent.parse("garbage"))
     }
+    @Test fun importsFiniteUtcRecurringEvents() {
+        val event = ICalendarEvent.parse(calendar(
+            "UID:daily-1\nSUMMARY:Daily check-in\nDTSTART:20261119T130000Z\n" +
+                "DTEND:20261119T140000Z\nRRULE:FREQ=DAILY;COUNT=5"
+        ))!!
+        assertEquals("FREQ=DAILY;INTERVAL=1;COUNT=5", event.rrule)
+        assertEquals(3600000L, event.endMillis - event.startMillis)
+        assertFalse(event.allDay)
+    }
+
+    @Test fun importsFiniteAllDayRecurringEvents() {
+        val event = ICalendarEvent.parse(calendar(
+            "UID:monthly-1\nSUMMARY:Reminder\nDTSTART;VALUE=DATE:20261215\n" +
+                "DTEND;VALUE=DATE:20261216\nRRULE:FREQ=MONTHLY;BYMONTHDAY=15;COUNT=6"
+        ))!!
+        assertEquals("FREQ=MONTHLY;INTERVAL=1;COUNT=6;BYMONTHDAY=15", event.rrule)
+        assertTrue(event.allDay)
+    }
+
+    @Test fun refusesRecurrenceExceptionsAndTimeZoneAmbiguity() {
+        val base = "UID:meeting\nSUMMARY:Meeting\nDTSTART:20261119T130000Z\n" +
+            "DTEND:20261119T140000Z\nRRULE:FREQ=WEEKLY;COUNT=8"
+        assertNull(ICalendarEvent.parse(calendar(base + "\nEXDATE:20261126T130000Z")))
+        assertNull(ICalendarEvent.parse(calendar(base + "\nRECURRENCE-ID:20261119T130000Z")))
+        assertNull(ICalendarEvent.parse(calendar(base.replace(
+            "DTSTART:20261119T130000Z", "DTSTART;TZID=Europe/Berlin:20261119T140000"
+        ))))
+        assertNull(ICalendarEvent.parse(calendar(base.replace(
+            "RRULE:FREQ=WEEKLY;COUNT=8", "RRULE:FREQ=WEEKLY"
+        ))))
+        assertNull(ICalendarEvent.parse(calendar(base.replace(
+            "RRULE:FREQ=WEEKLY;COUNT=8", "RRULE:FREQ=WEEKLY;UNTIL=20261101T130000Z"
+        ))))
+    }
+
 }
