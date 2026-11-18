@@ -23,7 +23,7 @@ Sessions are issued only after full WebAuthn library validation and active-accou
 ### Restrictions before public production deployment
 
 - The authenticated session in this process is not yet recognized by the **existing Cal45 calendar/contact web frontend**.
-- The account page does not issue app passwords. Device management remains disabled.
+- The account page now issues and revokes per-device DAV app passwords only after a fresh WebAuthn login, with CSRF and exact-origin checks. This remains a developer preview, not a production-ready identity or recovery system.
 - Sessions and WebAuthn ceremony state are in-memory; restarts invalidate sessions. Single-replica only.
 - TLS must terminate at a trusted proxy, and auth headers must not be forgeable; the service itself only speaks plain HTTP on loopback.
 - Reverse proxy needs connection limits, abuse controls and strongly isolated DAV storage. HTTP rate limiter is an additional defensive mechanism, not a full production solution.

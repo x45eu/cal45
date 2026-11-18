@@ -40,3 +40,8 @@ The isolated module now includes opt-in first-enrollment handlers and a Cal45-br
 - CI now verifies module checksums, runs race-enabled tests, vet, bootstrap CLI compilation, and JavaScript syntax checks.
 
 All endpoint wiring remains opt-in and disabled in the running Cal45 web preview. These controls are not a substitute for deployment TLS/proxy protections, a full MFA policy, and browser/hardware tests.
+
+
+## Device passwords via passkey session
+
+The opt-in auth server now registers user-scoped device-password endpoints and an account UI. Following a verified WebAuthn login, the user can list their own devices, create a cryptographically random one-time app password, and revoke device access. Creation and revocation require CSRF, exact origin and a passkey login within the last five minutes. The same on-disk locked token registry is used by the DAV gateway. This remains a developer preview; see [DEVICES.md](DEVICES.md) and [AUTH_SERVER.md](AUTH_SERVER.md).

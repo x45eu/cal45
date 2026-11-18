@@ -8,7 +8,7 @@ Cal45 is a lightweight, self-hosted CalDAV/CardDAV service with a standalone Go 
 
 ## Current status
 
-- Go HTML/CSS frontend: **initial design preview available** (no login, no live calendar sync).
+- Go HTML/CSS frontend: **initial design preview available** (no login, no live calendar sync). A separately opt-in auth-preview now provides passkey login, sessions and device-token management, but has not yet secured the main calendar web frontend.
 - DAV backend: Radicale isolated behind a Go app-password gateway, with owner-only rights.
 - Passkeys: **cryptographic WebAuthn verification and persistent credential storage now implemented in the isolated `passkeys/` Go module**, but this module is not connected to the web server; no usable passkey login is active. TOTP, recovery and web-session primitives exist but remain unconnected. See [Web authentication roadmap](docs/web-auth.md).
 - The UI and DAV gateway bind only to loopback; the DAV engine has no host port. **Not ready for public production use**.
@@ -43,8 +43,10 @@ Accounts can be disabled without deleting calendars or contacts. See the [Gatewa
 - `docs/web-auth.md`: TOTP, sessions, and WebAuthn integration requirements
 - `docs/passkeys.md`: passkey ceremony state and security boundaries
 - `passkeys/BOOTSTRAP.md`: operator-issued first-passkey grants
-- `passkeys/ENROLLMENT_HTTP.md`: browser enrollment flow, intentionally not yet enabled on the running web server
-- `passkeys/`: WebAuthn verification, credential storage, guarded browser adapter and operator-only one-time enrollment grants (not yet deployed)
+- `passkeys/ENROLLMENT_HTTP.md`: browser enrollment flow
+- `docs/auth-preview.md`: optional local passkey web service and TLS deployment caveats
+- `passkeys/DEVICES.md`: authenticated device password management
+- `passkeys/`: opt-in Passkey auth service with account sessions, operator-issued bootstrap grants and authenticated DAV-device-token UI (not deployed by default)
 - `docs/dav-gateway.md`: operator accounts, app tokens, gateway and migration
 - `assets/cal45-logo.svg`: canonical Cal45 logo
 
@@ -57,7 +59,7 @@ Accounts can be disabled without deleting calendars or contacts. See the [Gatewa
 
 ## Production security requirements
 
-**Do not deploy publicly in its current state.** There is no authenticated Cal45 web user session or account administration yet. Gateway app passwords are operator-provisioned only. WebAuthn/TOTP screens are informational only. Refer to [docs/frontend.md](docs/frontend.md) for concrete security acceptance criteria, including sharing identities with DAV clients.
+**Do not deploy publicly in its current state.** The main Cal45 web UI still has no authenticated session or account administration. A separate opt-in auth-preview supports passkey sessions and device credentials, but requires complete TLS/proxy integration, MFA/recovery policies and security review before public use. WebAuthn/TOTP screens are informational only. Refer to [docs/frontend.md](docs/frontend.md) for concrete security acceptance criteria, including sharing identities with DAV clients.
 
 ## Credits and licensing
 
