@@ -11,7 +11,7 @@ Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with G
 - An explicit button deletes stored local credentials.
 - No redirect following, no custom trust-all TLS handling, no external JavaScript or analytics. OkHttp is the one HTTP dependency needed for WebDAV's PROPFIND method.
 - **No synchronization yet**. An HTTP 207 check alone does not prove complete CalDAV/CardDAV interoperability.
-- The Android UI only accepts Cal45-formatted app tokens beginning with `cal45_` (at least 32 characters). This prevents accidentally entering an ordinary user password, **but does not cryptographically prove that a credential is an app password**.\n- **BLOCKER:** The current Radicale htpasswd configuration has no separate app-password issuer or server-side token validation. Any matching htpasswd password may still work if it has that format. Do not consider per-device app passwords enforced until the central Cal45 authentication service is implemented and the raw DAV endpoint is protected.\n- DNS names can resolve to IP addresses internally as part of normal networking; the rule prohibits entering *IP literals* as server URLs. A DNS record pointing at a private address is not itself blocked.
+- The Android UI only accepts Cal45-formatted app tokens beginning with `cal45_` (at least 32 characters). This prevents accidentally entering an ordinary user password, **but does not cryptographically prove that a credential is an app password**.\n- **BLOCKER:** The Go gateway now validates separately issued Cal45 device tokens and removes untrusted identity headers. Issuing tokens remains restricted to the operator CLI; secure web self-service and live compatibility testing are still pending.
 
 ## No Android Studio needed
 
