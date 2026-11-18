@@ -20,3 +20,8 @@ The module has a pinned Go dependency graph and checksum file based on the verif
 The optional `Endpoint` in `http.go` exposes POST `/auth/passkey/login/begin` and POST `/auth/passkey/login/finish` only if the embedding server explicitly calls `Register` with a verified session issuer. The begin call takes JSON `{"username":"alice"}` and returns WebAuthn assertion options plus an opaque ceremony handle. It sets a Secure, HttpOnly, SameSite=Strict, 120-second challenge-binding cookie. The finish endpoint receives the raw WebAuthn assertion JSON body and `X-Cal45-Ceremony`/`X-Cal45-Username` headers; it does not issue a session until the WebAuthn verifier returns success and the embedding application's MFA policy callback allows it. Strict Origin checks and a body cap apply. This is an **internal adapter**, not production-ready public authentication: rate limiting, browser UX, initial key enrollment, persistence review, CI success and deployment TLS are outstanding.
 
 The browser login screen is in [web/](web/). The opt-in HTTP adapter requires a verified login session issuer and allows registration routes only when an explicit step-up authorization callback is provided. These are library integration hooks, not configured routes in the running server.
+
+
+## Initial passkey provisioning
+
+The operator-only helper in [`cmd/cal45-passkey-bootstrap`](cmd/cal45-passkey-bootstrap) generates 10-minute, one-use enrollment grants for previously provisioned active Cal45 accounts. Grant storage uses file locking and never persists plaintext tokens. See [BOOTSTRAP.md](BOOTSTRAP.md). The browser registration route is **not yet wired to this grant**. No public enrollment has been enabled.

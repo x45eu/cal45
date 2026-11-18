@@ -30,3 +30,8 @@ Next integration gates: (1) strongly authorized initial enrollment and recovery,
 An opt-in HTTP adapter and Cal45-branded HTML/CSS/vanilla-JavaScript passkey login screen now exist under `passkeys/`. The browser uses the native WebAuthn API; no third-party browser JavaScript is required. The server's registration routes remain absent unless an embedding application explicitly supplies a strongly reauthenticated account authorization callback. Login routes remain absent without a session issuer.
 
 The separate module's dependency graph and Go checksums are pinned. **Still not integrated with Cal45's publicly started web service**; a real bootstrap mechanism, full user-session policy, rate limiting, browser/hardware tests and a passing production build must precede launch. Do not expose these as working login routes yet.
+
+
+## Initial passkey setup grants
+
+Operator-created enrollment grants now have an independent CLI, a 10-minute expiry, SHA-256-only storage and atomic single-use consumption. Details: [passkeys/BOOTSTRAP.md](../passkeys/BOOTSTRAP.md). The passkey enrollment HTTP integration remains intentionally disabled until a secure bootstrap-session handshake, browser ceremony, rate limits and end-to-end tests are implemented.
