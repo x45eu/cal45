@@ -30,3 +30,13 @@ The operator-only helper in [`cmd/cal45-passkey-bootstrap`](cmd/cal45-passkey-bo
 ## First-passkey enrollment integration
 
 The isolated module now includes opt-in first-enrollment handlers and a Cal45-branded browser screen. An operator-generated single-use ten-minute setup secret is redeemed via an origin-checked JSON POST, followed by a 120-second cookie-bound WebAuthn registration ceremony. The adapter does not mint a login session, and cannot be used to add a second passkey to an enrolled account. **The running preview does not register these endpoints or serve the enrollment page.** See [ENROLLMENT_HTTP.md](ENROLLMENT_HTTP.md) for outstanding deployment security requirements.
+
+
+## Hardening progress
+
+- Opt-in passkey login and enrollment handlers now have a bounded, in-process source-IP limiter and a global request limit. They do **not** trust arbitrary `X-Forwarded-For` headers. Behind a reverse proxy, all visitors may share a single gateway-IP bucket, so deploy a properly configured trusted proxy with its own per-client limits and a controlled client-IP policy.
+- First-passkey registration uses an **atomic first-credential-only** repository operation: parallel initial setup requests cannot add a second credential. Additional passkeys still require reauthenticated step-up authorization.
+- Credential counters reject repeated, decreasing, or zero-reset counters once the authenticator had a positive count. Authenticators that consistently report zero remain supported.
+- CI now verifies module checksums, runs race-enabled tests, vet, bootstrap CLI compilation, and JavaScript syntax checks.
+
+All endpoint wiring remains opt-in and disabled in the running Cal45 web preview. These controls are not a substitute for deployment TLS/proxy protections, a full MFA policy, and browser/hardware tests.

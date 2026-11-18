@@ -18,6 +18,12 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.27.1"
+      - run: go mod verify
       - run: go test -mod=readonly -race ./...
       - run: go vet -mod=readonly ./...
       - run: go build -mod=readonly ./cmd/cal45-passkey-bootstrap
+      - name: Check browser WebAuthn script syntax
+        working-directory: passkeys/web
+        run: |
+          node --check login.js
+          node --check enroll.js

@@ -35,3 +35,8 @@ The separate module's dependency graph and Go checksums are pinned. **Still not 
 ## Initial passkey setup grants
 
 Operator-created enrollment grants now have an independent CLI, a 10-minute expiry, SHA-256-only storage and atomic single-use consumption. Details: [passkeys/BOOTSTRAP.md](../passkeys/BOOTSTRAP.md). The passkey enrollment HTTP integration remains intentionally disabled until a secure bootstrap-session handshake, browser ceremony, rate limits and end-to-end tests are implemented.
+
+
+## Additional pre-launch protections
+
+Both opt-in passkey HTTP adapters now include bounded source and global attempt limits; trusted reverse-proxy rate limits remain necessary. The initial-registration repository operation atomically rejects second credentials even under concurrent requests, and counters cannot revert to zero after becoming positive. Tests for these cases have been added. Full build/test success has not yet been independently confirmed.
