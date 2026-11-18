@@ -10,7 +10,7 @@ Cal45 is a lightweight, self-hosted CalDAV/CardDAV service with a standalone Go 
 
 - Go HTML/CSS frontend: **initial design preview available** (no login, no live calendar sync). A separately opt-in auth-preview now provides passkey login, sessions and device-token management, but has not yet secured the main calendar web frontend.
 - DAV backend: Radicale isolated behind a Go app-password gateway, with owner-only rights.
-- Android: Cal45 Sync v0.7 includes HTTPS app-password login, Android Contacts/Calendar SyncAdapters, optional 6-hour background imports, and **ETag-guarded updates for clean calendar events**. CardDAV detects changes but does not yet overwrite existing contacts. Deletions, recurrence, conflict merging and bidirectional sync are still missing. See [Android status](android/README.md).
+- Android: Cal45 Sync v0.8 includes HTTPS app-password login, Android Contacts/Calendar SyncAdapters, optional 6-hour background imports, and **conservative ETag-guarded contact/calendar updates**. Local edits and legacy records remain protected. Deletions, recurring events, uploads and full conflict merging are still missing. See [Android status](android/README.md).
 - Passkeys: the optional, separately launched auth-preview now connects WebAuthn verification, persistent credentials, browser login, secure sessions and self-service device passwords. **It is not enabled by default or connected to the main calendar frontend**. TOTP and account recovery policies remain unfinished. See [Auth preview deployment notes](docs/auth-preview.md).
 - The UI and DAV gateway bind only to loopback; the DAV engine has no host port. **Not ready for public production use**.
 
