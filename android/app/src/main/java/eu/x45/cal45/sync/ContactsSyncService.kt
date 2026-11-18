@@ -133,14 +133,13 @@ internal class ContactsSyncAdapter(context: Context) :
         prior: ImportedContact,
         remote: VCardContact.Parsed
     ): Boolean {
-        val data = ContactsContract.Data
         val names = ArrayList<DataField>()
         val phones = ArrayList<DataField>()
         val emails = ArrayList<DataField>()
         var unsupported = false
         context.contentResolver.query(
-            data.CONTENT_URI, arrayOf(data._ID, data.MIMETYPE, data.DATA1),
-            "${data.RAW_CONTACT_ID}=?", arrayOf(prior.id.toString()), null
+            ContactsContract.Data.CONTENT_URI, arrayOf(ContactsContract.Data._ID, ContactsContract.Data.MIMETYPE, ContactsContract.Data.DATA1),
+            "${ContactsContract.Data.RAW_CONTACT_ID}=?", arrayOf(prior.id.toString()), null
         )?.use { cursor ->
             while (cursor.moveToNext()) {
                 val field = DataField(cursor.getLong(0), cursor.getString(2) ?: "")
@@ -164,14 +163,13 @@ internal class ContactsSyncAdapter(context: Context) :
 
         // Atomic transaction: re-check the exact raw-contact metadata and each
         // prior field value. Concurrent modifications fail rather than overwrite.
-        val raw = ContactsContract.RawContacts
-        val rawUri = raw.CONTENT_URI.buildUpon()
+        val rawUri = ContactsContract.RawContacts.CONTENT_URI.buildUpon()
             .appendQueryParameter(ContactsContract.CALLER_IS_SYNCADAPTER, "true").build()
-        val dataUri = data.CONTENT_URI.buildUpon()
+        val dataUri = ContactsContract.Data.CONTENT_URI.buildUpon()
             .appendQueryParameter(ContactsContract.CALLER_IS_SYNCADAPTER, "true").build()
-        val where = "${raw._ID}=? AND ${raw.ACCOUNT_TYPE}=? AND ${raw.ACCOUNT_NAME}=? AND " +
-            "${raw.SOURCE_ID}=? AND ${raw.SYNC1}=? AND ${raw.SYNC2}=? AND " +
-            "${raw.DIRTY}=0 AND ${raw.DELETED}=0"
+        val where = "${ContactsContract.RawContacts._ID}=? AND ${ContactsContract.RawContacts.ACCOUNT_TYPE}=? AND ${ContactsContract.RawContacts.ACCOUNT_NAME}=? AND " +
+            "${ContactsContract.RawContacts.SOURCE_ID}=? AND ${ContactsContract.RawContacts.SYNC1}=? AND ${ContactsContract.RawContacts.SYNC2}=? AND " +
+            "${ContactsContract.RawContacts.DIRTY}=0 AND ${ContactsContract.RawContacts.DELETED}=0"
         val params = arrayOf(
             prior.id.toString(), account.type, account.name, source,
             prior.etag ?: return false, prior.fingerprint ?: return false
@@ -186,13 +184,13 @@ internal class ContactsSyncAdapter(context: Context) :
                 if (sortedOld[index].value == sortedNew[index]) continue
                 ops.add(ContentProviderOperation.newUpdate(dataUri)
                     .withSelection(
-                        "${data._ID}=? AND ${data.RAW_CONTACT_ID}=? AND ${data.DATA1}=?",
+                        "${ContactsContract.Data._ID}=? AND ${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.DATA1}=?",
                         arrayOf(
                             sortedOld[index].id.toString(), prior.id.toString(),
                             sortedOld[index].value
                         )
                     )
-                    .withValue(data.DATA1, sortedNew[index])
+                    .withValue(ContactsContract.Data.DATA1, sortedNew[index])
                     .withExpectedCount(1).build())
             }
         }
@@ -201,8 +199,8 @@ internal class ContactsSyncAdapter(context: Context) :
         changes(emails, remote.emails)
         ops.add(ContentProviderOperation.newUpdate(rawUri)
             .withSelection(where, params)
-            .withValue(raw.SYNC1, etag)
-            .withValue(raw.SYNC2, ContactChangePolicy.fingerprint(remote))
+            .withValue(ContactsContract.RawContacts.SYNC1, etag)
+            .withValue(ContactsContract.RawContacts.SYNC2, ContactChangePolicy.fingerprint(remote))
             .withExpectedCount(1).build())
         return try {
             context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
