@@ -2,6 +2,8 @@ package passkeys
 
 import (
  "encoding/json"
+ "crypto/sha256"
+ "encoding/hex"
  "net/http"
  "net/http/httptest"
  "os"
@@ -46,6 +48,13 @@ func TestDevicePasswordCreateListAndRevoke(t *testing.T){
  }
  raw,err:=os.ReadFile(device.TokenFile);if err!=nil{t.Fatal(err)}
  if strings.Contains(string(raw),issued.Password){t.Fatal("plaintext token persisted")}
+ var persisted struct{Tokens []deviceEntry `json:"tokens"`}
+ if err:=json.Unmarshal(raw,&persisted);err!=nil{t.Fatal(err)}
+ if len(persisted.Tokens)!=1{t.Fatal("expected one issued token")}
+ sum:=sha256.Sum256([]byte(issued.Password))
+ if persisted.Tokens[0].SHA256!=hex.EncodeToString(sum[:]){
+  t.Fatal("stored digest does not match issued app password")
+ }
  request:=httptest.NewRequest("GET","/auth/devices",nil)
  request.AddCookie(newSessionCookie(session))
  list:=httptest.NewRecorder();mux.ServeHTTP(list,request)
@@ -56,6 +65,9 @@ func TestDevicePasswordCreateListAndRevoke(t *testing.T){
  revoked:=sendDeviceRequest(mux,"/auth/devices/revoke",
   `{"id":"`+issued.ID+`"}`,session,csrf)
  if revoked.Code!=204{t.Fatalf("revoke failed: %d",revoked.Code)}
+ raw,err=os.ReadFile(device.TokenFile);if err!=nil{t.Fatal(err)}
+ if err:=json.Unmarshal(raw,&persisted);err!=nil{t.Fatal(err)}
+ if !persisted.Tokens[0].Revoked{t.Fatal("revocation not saved")}
  revoked=sendDeviceRequest(mux,"/auth/devices/revoke",
   `{"id":"`+issued.ID+`"}`,session,csrf)
  if revoked.Code!=404{t.Fatal("token revoked twice")}
