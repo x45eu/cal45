@@ -389,6 +389,44 @@ class MainActivity : AccountAuthenticatorActivity() {
             }
         }
 
+        val journalButton = Button(this).apply {
+            text = "Abgleichsverlauf prüfen"
+            isAllCaps = false
+            setTextColor(light)
+        }
+        panelView.addView(journalButton)
+        journalButton.setOnClickListener {
+            val selectedAccount = Cal45BackgroundSync.account(this)
+            if (selectedAccount == null) {
+                status.text = "Zuerst das Cal45-Systemkonto verbinden."
+                return@setOnClickListener
+            }
+            journalButton.isEnabled = false
+            thread {
+                val message = try {
+                    val entries = SyncJournalStore(this, selectedAccount.name).list()
+                    val summary = SyncJournalSummary.summarize(entries)
+                    if (summary.total == 0) {
+                        "Noch keine Versionen im privaten Abgleichsverlauf erfasst."
+                    } else {
+                        "Abgleichsverlauf: ${summary.total} Einträge " +
+                            "(${summary.contacts} Kontakte, ${summary.events} Termine). " +
+                            "${summary.imported} importiert, " +
+                            "${summary.conflicts} Konflikte, " +
+                            "${summary.blocked} gesperrt. " +
+                            "Gespeichert sind nur Versionsnummern und Hashes."
+                    }
+                } catch (_: Exception) {
+                    "Abgleichsverlauf beschädigt oder nicht lesbar. " +
+                        "Kein Upload möglich. Bestehende Daten bleiben unangetastet."
+                }
+                runOnUiThread {
+                    status.text = message
+                    journalButton.isEnabled = true
+                }
+            }
+        }
+
         val forget = Button(this).apply {
             text = "Gespeichertes Konto entfernen"
             isAllCaps = false
