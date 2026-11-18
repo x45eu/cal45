@@ -1,26 +1,23 @@
 package eu.x45.cal45.sync
 
 import android.app.Activity
-import android.os.Bundle
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
+import android.os.Bundle
+import android.text.InputType
 import android.view.Gravity
-import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import java.net.HttpURLConnection
-import java.net.URI
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
 import kotlin.concurrent.thread
 
 /**
- * Initial setup screen only. Does not manage Android accounts, store credentials,
- * implement CalDAV/CardDAV, or claim to synchronize data.
+ * Cal45 Sync credential enrollment, no calendar/contact sync yet.
+ * Supports existing DAV user credentials; dedicated app passwords will
+ * be issued by Cal45 server once its account management is implemented.
  */
 class MainActivity : Activity() {
     private val navy = Color.rgb(25, 34, 44)
@@ -41,8 +38,8 @@ class MainActivity : Activity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = navy
         window.navigationBarColor = navy
-        window.decorView.systemUiVisibility = 0
 
+        val vault = CredentialVault(this)
         val scroll = ScrollView(this).apply { setBackgroundColor(navy) }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -59,14 +56,11 @@ class MainActivity : Activity() {
                 if (bold) setTypeface(null, Typeface.BOLD)
             }
 
-        val title = text("cal45", 40f, light, true)
-        root.addView(title)
-        val subtitle = text("SYNC  •  CALDAV + CARDDAV", 12f, accent, true)
-        root.addView(subtitle)
-        val intro = text("Dein Kalender. Deine Kontakte. Deine Cloud.", 17f, light).apply {
+        root.addView(text("cal45", 40f, light, true))
+        root.addView(text("SYNC  •  CALDAV + CARDDAV", 12f, accent, true))
+        root.addView(text("Dein Kalender. Deine Kontakte. Deine Cloud.", 17f, light).apply {
             setPadding(0, dp(26), 0, dp(28))
-        }
-        root.addView(intro)
+        })
 
         val panelView = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -74,27 +68,37 @@ class MainActivity : Activity() {
             background = bg(panel)
         }
         root.addView(panelView, LinearLayout.LayoutParams(-1, -2))
-        panelView.addView(text("Server verbinden", 22f, light, true))
-        panelView.addView(text("Trage die HTTPS-Adresse deines Cal45-Servers ein.", 14f, muted).apply {
+        panelView.addView(text("Cal45-Konto verbinden", 22f, light, true))
+        panelView.addView(text("DAV-Server und Zugangsdaten prüfen. Synchronisierung folgt in einer späteren Version.", 14f, muted).apply {
             setPadding(0, dp(8), 0, dp(20))
         })
 
-        val server = EditText(this).apply {
-            hint = "https://cal45.example.com/"
-            setHintTextColor(muted)
-            setTextColor(light)
-            setSingleLine(true)
-            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
-            setPadding(dp(14), dp(12), dp(14), dp(12))
-            background = bg(navy, 8)
-            setText(getPreferences(MODE_PRIVATE).getString("server_url", "") ?: "")
-        }
-        panelView.addView(server, LinearLayout.LayoutParams(-1, -2))
-        val status = text("Noch nicht verbunden", 13f, muted).apply {
+        fun field(hintValue: String, type: Int): EditText =
+            EditText(this).apply {
+                hint = hintValue
+                setHintTextColor(muted)
+                setTextColor(light)
+                setSingleLine(true)
+                inputType = type
+                setPadding(dp(14), dp(12), dp(14), dp(12))
+                background = bg(navy, 8)
+                val params = LinearLayout.LayoutParams(-1, dp(52))
+                params.bottomMargin = dp(10)
+                panelView.addView(this, params)
+            }
+
+        val server = field("https://cal45.example.com/", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
+        val username = field("Benutzername", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL)
+        val appPassword = field("App-Passwort", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        appPassword.setTextIsSelectable(false)
+        server.setText(vault.server())
+        username.setText(vault.username())
+
+        val status = text(if (vault.configured()) "Konto auf diesem Gerät gespeichert (Sync noch in Entwicklung)." else "Noch kein Konto verbunden", 13f, muted).apply {
             setPadding(0, dp(15), 0, dp(10))
         }
         val check = Button(this).apply {
-            text = "HTTPS-Verbindung prüfen"
+            text = "DAV-Zugang prüfen und speichern"
             setTextColor(navy)
             backgroundTintList = android.content.res.ColorStateList.valueOf(accent)
             isAllCaps = false
@@ -103,51 +107,56 @@ class MainActivity : Activity() {
         panelView.addView(status)
 
         check.setOnClickListener {
-            val input = server.text.toString().trim()
-            val uri = try { URI(input) } catch (_: Exception) { null }
-            if (uri == null || !uri.scheme.equals("https", true) ||
-                uri.host.isNullOrBlank() || !uri.rawUserInfo.isNullOrBlank() ||
-                uri.rawQuery != null || uri.rawFragment != null) {
-                status.text = "Bitte eine gültige HTTPS-Adresse ohne Zugangsdaten verwenden."
+            val url = server.text.toString().trim()
+            val user = username.text.toString().trim()
+            val password = appPassword.text.toString()
+            if (DavProbe.normalizedUrl(url) == null || user.isBlank() || password.isBlank()) {
+                status.text = "Bitte gültige HTTPS-Adresse, Benutzername und App-Passwort eingeben."
                 return@setOnClickListener
             }
-            // Never send credentials, and never follow redirects to other destinations.
             check.isEnabled = false
-            status.text = "Verbindung wird geprüft …"
+            status.text = "DAV-Anmeldung wird geprüft …"
             thread {
-                var conn: HttpsURLConnection? = null
-                val result = try {
-                    conn = URL(uri.toString()).openConnection() as HttpsURLConnection
-                    conn!!.connectTimeout = 6000
-                    conn!!.readTimeout = 6000
-                    conn!!.instanceFollowRedirects = false
-                    conn!!.requestMethod = "GET"
-                    val code = conn!!.responseCode
-                    if (code in listOf(200, 207, 401, 403)) {
-                        getPreferences(MODE_PRIVATE).edit().putString("server_url", uri.toString()).apply()
-                        "HTTPS-Server erreichbar (HTTP $code). DAV-Anmeldung ist noch nicht implementiert."
-                    } else {
-                        "Server antwortet mit HTTP $code. Bitte Adresse und Proxy prüfen."
+                val result = DavProbe.check(url, user, password)
+                val message = if (result.successful) {
+                    try {
+                        vault.save(DavProbe.normalizedUrl(url)!!, user, password)
+                        result.message + " Zugangsdaten verschlüsselt gespeichert."
+                    } catch (_: Exception) {
+                        "DAV erreichbar, aber verschlüsselte Speicherung fehlgeschlagen."
                     }
-                } catch (_: Exception) {
-                    "HTTPS-Verbindung fehlgeschlagen. Zertifikat, Adresse und Netzwerk prüfen."
-                } finally {
-                    conn?.disconnect()
-                }
+                } else result.message
                 runOnUiThread {
-                    status.text = result
+                    status.text = message
+                    if (result.successful && message.contains("gespeichert")) appPassword.text.clear()
                     check.isEnabled = true
                 }
             }
         }
+
+        val forget = Button(this).apply {
+            text = "Gespeichertes Konto entfernen"
+            isAllCaps = false
+            setTextColor(light)
+        }
+        panelView.addView(forget)
+        forget.setOnClickListener {
+            vault.remove()
+            server.text.clear()
+            username.text.clear()
+            appPassword.text.clear()
+            status.text = "Lokale Zugangsdaten entfernt."
+        }
+
         root.addView(text("Entwicklungsstand", 19f, light, true).apply {
             setPadding(0, dp(30), 0, dp(14))
         })
         root.addView(text("✓  Native Android-App ohne Google Play Services\n\n" +
-            "✓  HTTPS-Prüfung ohne gespeicherte Passwörter\n\n" +
-            "○  Konten und App-Passwörter: noch offen\n\n" +
-            "○  Kontakte-Sync: noch offen\n\n" +
-            "○  Kalender-Sync: noch offen", 15f, muted))
+            "✓  HTTPS-DAV-Authentifizierungsprüfung\n\n" +
+            "✓  Verschlüsselte App-Passwort-Speicherung (Android Keystore)\n\n" +
+            "○  Android-Systemkonto: noch offen\n\n" +
+            "○  Kontakte-Synchronisierung: noch offen\n\n" +
+            "○  Kalender-Synchronisierung: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(38), 0, 0)
