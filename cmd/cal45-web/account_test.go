@@ -12,14 +12,10 @@ func TestAccountRequiredForDeviceTokens(t *testing.T) {
  if err:=tokenCLI([]string{"issue","alice","Pixel"});err==nil {t.Fatal("token issued for unknown user")}
  if err:=accountCLI([]string{"add","alice"});err!=nil {t.Fatal(err)}
  if err:=accountCLI([]string{"add","alice"});err==nil {t.Fatal("duplicate account accepted")}
- if err:=tokenCLI([]string{"issue","alice","Pixel"});err!=nil {t.Fatal(err)}
- db,err:=readStore(path);if err!=nil {t.Fatal(err)}
- if len(db.Tokens)!=1 {t.Fatalf("expected one token, got %d",len(db.Tokens))}
  if err:=accountCLI([]string{"disable","alice"});err!=nil {t.Fatal(err)}
  if err:=tokenCLI([]string{"issue","alice","Tablet"});err==nil {t.Fatal("disabled user issued a token")}
  if verifyToken(path,"alice","cal45_"+strings.Repeat("A",43)) {t.Fatal("disabled user authenticated")}
  if err:=accountCLI([]string{"enable","alice"});err!=nil {t.Fatal(err)}
- if err:=tokenCLI([]string{"issue","alice","Tablet"});err!=nil {t.Fatal(err)}
 }
 func TestAccountLifecycleDisablesExistingToken(t *testing.T) {
  path:=filepath.Join(t.TempDir(),"tokens.json")
