@@ -42,7 +42,7 @@ Accounts can be disabled without deleting calendars or contacts. See the [Gatewa
 - `docs/frontend.md`: design and security architecture
 - `docs/web-auth.md`: TOTP, sessions, and WebAuthn integration requirements
 - `docs/passkeys.md`: passkey ceremony state and security boundaries
-- `passkeys/`: separate WebAuthn verification module and durable credential store (not yet connected to web login)
+- `passkeys/`: isolated WebAuthn verification, persistent credentials, guarded HTTP adapters, and branded browser passkey login UI (not yet deployed)
 - `docs/dav-gateway.md`: operator accounts, app tokens, gateway and migration
 - `assets/cal45-logo.svg`: canonical Cal45 logo
 

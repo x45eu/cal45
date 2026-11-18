@@ -23,3 +23,10 @@ See also [web authentication roadmap](web-auth.md).
 The isolated [passkeys Go module](../passkeys/README.md) now uses `go-webauthn/webauthn` v0.18.2 for actual WebAuthn registration and assertion signature verification, with user verification required. It also provides a file-backed account-bound credential store (stable random handles, credential uniqueness, counter updates and account disable checks), but **it has no publicly exposed web routes**.
 
 Next integration gates: (1) strongly authorized initial enrollment and recovery, (2) exact TLS origin and session-binding middleware, (3) browser ceremony handlers and user verification, (4) MFA/session policies, (5) verified self-service device management. The isolated module CI runs `go mod tidy`, `go test -race` and `go vet`; its outcome is not yet confirmed, and dependency checksums still need to be committed.
+
+
+## Browser integration progress
+
+An opt-in HTTP adapter and Cal45-branded HTML/CSS/vanilla-JavaScript passkey login screen now exist under `passkeys/`. The browser uses the native WebAuthn API; no third-party browser JavaScript is required. The server's registration routes remain absent unless an embedding application explicitly supplies a strongly reauthenticated account authorization callback. Login routes remain absent without a session issuer.
+
+The separate module's dependency graph and Go checksums are pinned. **Still not integrated with Cal45's publicly started web service**; a real bootstrap mechanism, full user-session policy, rate limiting, browser/hardware tests and a passing production build must precede launch. Do not expose these as working login routes yet.
