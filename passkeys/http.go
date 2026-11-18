@@ -27,6 +27,7 @@ type Endpoint struct{
  Origin string
  IssueSession LoginSessionIssuer
  AuthorizeRegistration RegistrationAuthorizer
+ Limiter *AttemptLimiter
 }
 
 // Register explicitly opt-ins handlers to the given mux. The invoking server
@@ -36,6 +37,7 @@ type Endpoint struct{
 func(e *Endpoint)Register(mux *http.ServeMux)error{
  if e==nil||e.Service==nil||e.IssueSession==nil||mux==nil{return ErrUnavailable}
  if _,err:=ValidOrigin(e.Origin);err!=nil{return err}
+ if e.Limiter==nil {e.Limiter=NewAttemptLimiter()}
  mux.HandleFunc("POST /auth/passkey/login/begin",e.begin)
  mux.HandleFunc("POST /auth/passkey/login/finish",e.finish)
  // Registration routes can only be installed when a strict step-up
@@ -75,6 +77,7 @@ func randomBinding()(string,error){
 }
 func(e *Endpoint)begin(w http.ResponseWriter,r *http.Request){
  if !e.checkRequest(r){fail(w,http.StatusForbidden);return}
+ if !e.Limiter.Allow(r){rejectBusy(w);return}
  var request struct{Username string `json:"username"`}
  if readObject(w,r,&request)!=nil {fail(w,http.StatusBadRequest);return}
  // No cookie can be set until after initiating a new isolated ceremony.
@@ -92,6 +95,7 @@ func(e *Endpoint)begin(w http.ResponseWriter,r *http.Request){
 }
 func(e *Endpoint)finish(w http.ResponseWriter,r *http.Request){
  if !e.checkRequest(r){fail(w,http.StatusForbidden);return}
+ if !e.Limiter.Allow(r){rejectBusy(w);return}
  // The WebAuthn assertion is the request body, as required by the verifier.
  ceremony:=r.Header.Get("X-Cal45-Ceremony")
  username:=r.Header.Get("X-Cal45-Username")
@@ -117,6 +121,7 @@ func(e *Endpoint)finish(w http.ResponseWriter,r *http.Request){
 
 func(e *Endpoint)registerBegin(w http.ResponseWriter,r *http.Request){
  if !e.checkRequest(r){fail(w,http.StatusForbidden);return}
+ if !e.Limiter.Allow(r){rejectBusy(w);return}
  user,binding,err:=e.AuthorizeRegistration(r)
  if err!=nil||user==""||len(binding)<32{fail(w,http.StatusUnauthorized);return}
  options,handle,err:=e.Service.BeginRegistration(user,binding)
@@ -130,6 +135,7 @@ func(e *Endpoint)registerBegin(w http.ResponseWriter,r *http.Request){
 }
 func(e *Endpoint)registerFinish(w http.ResponseWriter,r *http.Request){
  if !e.checkRequest(r){fail(w,http.StatusForbidden);return}
+ if !e.Limiter.Allow(r){rejectBusy(w);return}
  user,binding,err:=e.AuthorizeRegistration(r)
  if err!=nil||user==""||len(binding)<32{fail(w,http.StatusUnauthorized);return}
  ceremony:=r.Header.Get("X-Cal45-Ceremony")

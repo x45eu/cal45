@@ -16,6 +16,7 @@ type InitialEnrollment struct {
  Repository *JSONRepository
  Grants BootstrapStore
  Origin string
+ Limiter *AttemptLimiter
 
  mu sync.Mutex
  pending map[[32]byte]enrollmentBinding
@@ -32,6 +33,7 @@ func(e *InitialEnrollment)Register(mux *http.ServeMux)error{
  if e==nil||e.Service==nil||e.Repository==nil||e.Grants.Path==""||
   e.Grants.AccountIsActive==nil||mux==nil{return ErrUnavailable}
  if _,err:=ValidOrigin(e.Origin);err!=nil{return err}
+ if e.Limiter==nil{e.Limiter=NewAttemptLimiter()}
  if e.pending==nil{e.pending=make(map[[32]byte]enrollmentBinding)}
  if e.now==nil{e.now=time.Now}
  mux.HandleFunc("POST /auth/passkey/enroll/begin",e.beginEnrollment)
@@ -46,6 +48,7 @@ func(e *InitialEnrollment)check(r *http.Request)bool {
 }
 func(e *InitialEnrollment)beginEnrollment(w http.ResponseWriter,r *http.Request){
  if !e.check(r){fail(w,http.StatusForbidden);return}
+ if !e.Limiter.Allow(r){rejectBusy(w);return}
  var payload struct{
   Username string `json:"username"`
   SetupToken string `json:"setupToken"`
@@ -87,6 +90,7 @@ func(e *InitialEnrollment)beginEnrollment(w http.ResponseWriter,r *http.Request)
 }
 func(e *InitialEnrollment)finishEnrollment(w http.ResponseWriter,r *http.Request){
  if !e.check(r){fail(w,http.StatusForbidden);return}
+ if !e.Limiter.Allow(r){rejectBusy(w);return}
  ceremony:=r.Header.Get("X-Cal45-Ceremony")
  if len(ceremony)==0||len(ceremony)>96{fail(w,http.StatusBadRequest);return}
  cookie,err:=r.Cookie(enrollmentCookie)
@@ -104,7 +108,7 @@ func(e *InitialEnrollment)finishEnrollment(w http.ResponseWriter,r *http.Request
  // The real WebAuthn verification occurs here, including challenge, origin,
  // RP ID, attestation policy and user verification.
  r.Body=http.MaxBytesReader(w,r.Body,64*1024)
- if err:=e.Service.FinishRegistration(grant.Username,cookie.Value,ceremony,r);err!=nil{
+ if err:=e.Service.FinishInitialRegistration(grant.Username,cookie.Value,ceremony,r);err!=nil{
   fail(w,http.StatusForbidden);return
  }
  w.Header().Set("Cache-Control","no-store")

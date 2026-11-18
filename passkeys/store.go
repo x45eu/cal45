@@ -142,3 +142,22 @@ func(r *JSONRepository)SaveVerifiedCredential(username string,credential *webaut
   return nil
  })
 }
+
+// SaveFirstCredential guarantees first-passkey enrollment is atomic.
+// Even two concurrent bootstrap ceremonies cannot register two initial keys.
+func(r *JSONRepository)SaveFirstCredential(username string,credential *webauthn.Credential)error{
+ if credential==nil||len(credential.ID)==0{return ErrUnavailable}
+ return r.change(func(db *diskData)error{
+  if !r.accountActive(username){return ErrUnavailable}
+  u,ok:=db.Users[username]
+  if !ok||len(u.Handle)!=32||len(u.Credentials)!=0{return ErrUnavailable}
+  for _,other:=range db.Users {
+   for _,c:=range other.Credentials {
+    if bytes.Equal(c.ID,credential.ID){return ErrUnavailable}
+   }
+  }
+  u.Credentials=[]webauthn.Credential{*credential}
+  db.Users[username]=u
+  return nil
+ })
+}

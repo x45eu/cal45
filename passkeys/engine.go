@@ -132,3 +132,19 @@ func(s *Service)FinishLogin(username,loginBinding,handle string,r *http.Request)
  if err:=s.repo.SaveVerifiedCredential(username,credential);err!=nil{return "",err}
  return username,nil
 }
+
+// FinishInitialRegistration is reserved for the operator bootstrap flow.
+// The backing repository must atomically reject a second initial credential.
+func(s *Service)FinishInitialRegistration(username,binding,handle string,r *http.Request)error{
+ data,err:=s.consume(handle,username,binding,"register")
+ if err!=nil{return err}
+ repo,ok:=s.repo.(interface{
+  SaveFirstCredential(string,*webauthn.Credential)error
+ })
+ if !ok{return ErrUnavailable}
+ user,err:=s.repo.GetActive(username)
+ if err!=nil||len(user.Credentials)!=0{return ErrUnavailable}
+ credential,err:=s.verifier.FinishRegistration(user,data,r)
+ if err!=nil{return err}
+ return repo.SaveFirstCredential(username,credential)
+}
