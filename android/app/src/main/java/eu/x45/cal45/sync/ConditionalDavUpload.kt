@@ -5,6 +5,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
@@ -38,6 +39,60 @@ internal class ConditionalDavUpload(
         object Unauthorized : Result()
         object Unverified : Result()
     }
+    sealed class Snapshot {
+        data class Verified(val etag: String, val originalText: String) : Snapshot()
+        object Conflict : Snapshot()
+        object Unauthorized : Snapshot()
+        object Unverified : Snapshot()
+    }
+    /**
+     * Separate, read-only snapshot stage before any future write workflow.
+     * The original document is returned in RAM only, including fields the
+     * current Android parsers cannot represent. A later serializer MUST keep
+     * them losslessly or refuse the upload.
+     */
+    fun fetchVerifiedBase(source: String, media: Media, previousETag: String?): Snapshot {
+        val target = checkedSource(source, media)
+        val etag = CalDavReader.safeStrongETag(previousETag)
+            ?: return Snapshot.Unverified
+        val request = Request.Builder()
+            .url(target.toASCIIString())
+            .header("Authorization", authorization)
+            .header("If-Match", etag)
+            .header("Accept", media.contentType)
+            .get()
+            .build()
+        client.newCall(request).execute().use { response ->
+            when (response.code) {
+                409, 412 -> return Snapshot.Conflict
+                401, 403 -> return Snapshot.Unauthorized
+                200 -> Unit
+                else -> throw IOException("DAV preflight rejected (HTTP ${response.code})")
+            }
+            if (CalDavReader.safeStrongETag(response.header("ETag")) != etag)
+                return Snapshot.Unverified
+            val body = response.body ?: return Snapshot.Unverified
+            val out = ByteArrayOutputStream()
+            body.byteStream().use { input ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    if (Thread.currentThread().isInterrupted)
+                        throw IOException("DAV preflight interrupted")
+                    val size = input.read(buffer)
+                    if (size < 0) break
+                    if (out.size() + size > 256 * 1024)
+                        throw IOException("DAV preflight document too large")
+                    out.write(buffer, 0, size)
+                }
+            }
+            val text = out.toString("UTF-8")
+            val envelope = if (media == Media.VCARD) "VCARD" else "VCALENDAR"
+            if (!text.contains("BEGIN:$envelope") || !text.contains("END:$envelope"))
+                return Snapshot.Unverified
+            return Snapshot.Verified(etag, text)
+        }
+    }
+
     private val root = URI(DavProbe.normalizedUrl(server)
         ?: throw IllegalArgumentException("HTTPS-Domain erforderlich"))
     private val owner: URI
