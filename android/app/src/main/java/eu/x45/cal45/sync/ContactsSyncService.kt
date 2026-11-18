@@ -50,28 +50,29 @@ internal class ContactsSyncAdapter(context: Context) :
             return
         }
         try {
-            val existing = HashSet<String>()
+            val existing = HashMap<String, String?>()
             val uri = ContactsContract.RawContacts.CONTENT_URI
             context.contentResolver.query(
-                uri, arrayOf(ContactsContract.RawContacts.SOURCE_ID),
+                uri, arrayOf(ContactsContract.RawContacts.SOURCE_ID, ContactsContract.RawContacts.SYNC1),
                 "${ContactsContract.RawContacts.ACCOUNT_TYPE}=? AND ${ContactsContract.RawContacts.ACCOUNT_NAME}=?",
                 arrayOf(account.type, account.name), null
             )?.use { cursor ->
-                while (cursor.moveToNext()) cursor.getString(0)?.let { existing.add(it) }
+                while (cursor.moveToNext()) cursor.getString(0)?.let { existing[it] = cursor.getString(1) }
             } ?: throw IllegalStateException("Kontakteanbieter nicht verfügbar")
             val reader = CardDavReader(server, user, password)
-            val cards = reader.fetchNewCards(existing)
+            val scan = reader.scanCards(existing)
             var imported = 0
             var skipped = 0
-            for (card in cards) {
+            for (card in scan.newCards) {
                 if (Thread.currentThread().isInterrupted) break
                 val parsed = VCardContact.parse(card.text)
                 if (parsed == null) { skipped++; continue }
-                addContact(account, card.source, parsed)
+                addContact(account, card.source, card.etag, parsed)
                 imported++
                 syncResult.stats.numInserts++
             }
-            report("Import beendet: $imported neue Kontakte, $skipped nicht unterstützte Karten übersprungen.")
+            report("Kontaktabgleich: $imported neu, ${scan.changedExisting} auf dem Server geändert " +
+                "(lokal geschützt), $skipped nicht unterstützte Karten.")
         } catch (_: java.io.IOException) {
             syncResult.stats.numIoExceptions++
             report("DAV-Verbindung oder Adressbuchabruf fehlgeschlagen.")
@@ -84,7 +85,7 @@ internal class ContactsSyncAdapter(context: Context) :
         }
     }
 
-    private fun addContact(account: Account, source: String, card: VCardContact.Parsed) {
+    private fun addContact(account: Account, source: String, etag: String?, card: VCardContact.Parsed) {
         val rawUri = ContactsContract.RawContacts.CONTENT_URI
             .buildUpon().appendQueryParameter(ContactsContract.CALLER_IS_SYNCADAPTER, "true").build()
         val dataUri = ContactsContract.Data.CONTENT_URI
@@ -94,6 +95,7 @@ internal class ContactsSyncAdapter(context: Context) :
             .withValue(ContactsContract.RawContacts.ACCOUNT_NAME, account.name)
             .withValue(ContactsContract.RawContacts.ACCOUNT_TYPE, account.type)
             .withValue(ContactsContract.RawContacts.SOURCE_ID, source)
+            .withValue(ContactsContract.RawContacts.SYNC1, etag)
             .build())
         fun field(mime: String, column: String, value: String) {
             operations.add(ContentProviderOperation.newInsert(dataUri)
