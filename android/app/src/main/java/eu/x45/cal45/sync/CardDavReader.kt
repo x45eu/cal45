@@ -24,7 +24,7 @@ internal class CardDavReader(
     private val password: String
 ) {
     data class RemoteCard(val source: String, val text: String, val etag: String?)
-    data class Scan(val newCards: List<RemoteCard>, val changedExisting: Int)
+    data class Scan(val newCards: List<RemoteCard>, val changedCards: List<RemoteCard>, val protectedChanges: Int)
     data class DavResource(val href: String, val addressBook: Boolean, val etag: String?)
     private val client = OkHttpClient.Builder()
         .followRedirects(false)
@@ -67,11 +67,12 @@ internal class CardDavReader(
         return resolved
     }
 
-    private fun request(url: URI, method: String, body: String? = null, maxBytes: Int): String {
+    private fun request(url: URI, method: String, body: String? = null, maxBytes: Int, ifMatch: String? = null): String {
         if (!withinOwner(url)) throw IOException("DAV-Ziel liegt außerhalb des Kontos")
         val builder = Request.Builder().url(url.toASCIIString())
             .header("Authorization", auth)
             .header("Accept", "application/xml, text/vcard")
+        if (method == "GET" && ifMatch != null) builder.header("If-Match", ifMatch)
         val request = if (method == "PROPFIND") {
             builder.method(method, (body ?: "").toRequestBody(
                 "application/xml; charset=utf-8".toMediaType()
@@ -115,7 +116,8 @@ internal class CardDavReader(
             .take(10)
         val cards = ArrayList<RemoteCard>()
         val visited = HashSet<String>()
-        var changed = 0
+        var protectedChanges = 0
+        val changedCards = ArrayList<RemoteCard>()
         for (book in books) {
             if (!withinOwner(book)) continue
             val resources = propfind(book)
@@ -128,14 +130,24 @@ internal class CardDavReader(
                 if (!visited.add(source)) continue
                 if (source in knownSources) {
                     val saved = knownSources[source]
-                    if (saved != null && resource.etag != null && saved != resource.etag) changed++
+                    if (saved != null && resource.etag != null && saved != resource.etag) {
+                        val strong = ContactChangePolicy.safeETag(resource.etag)
+                        if (ContactChangePolicy.safeETag(saved) != null && strong != null) {
+                            if (cards.size + changedCards.size >= maximum)
+                                throw IOException("CardDAV-Sicherheitslimit für Änderungen")
+                            changedCards.add(RemoteCard(
+                                source, request(remote, "GET", maxBytes = 256 * 1024, ifMatch = strong),
+                                strong
+                            ))
+                        } else protectedChanges++
+                    }
                     continue
                 }
-                if (cards.size >= maximum) throw IOException("CardDAV-Sicherheitslimit: zu viele neue Kontakte")
-                cards.add(RemoteCard(source, request(remote, "GET", maxBytes = 256 * 1024), resource.etag?.take(182)))
+                if (cards.size + changedCards.size >= maximum) throw IOException("CardDAV-Sicherheitslimit: zu viele Kontakte")
+                cards.add(RemoteCard(source, request(remote, "GET", maxBytes = 256 * 1024), ContactChangePolicy.safeETag(resource.etag)))
             }
         }
-        return Scan(cards, changed)
+        return Scan(cards, changedCards, protectedChanges)
     }
 
     companion object {
