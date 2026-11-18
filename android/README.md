@@ -2,7 +2,7 @@
 
 Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with GrapheneOS without Google Play Services.
 
-## Current development status: 0.3 prototype
+## Current development status: 0.4 prototype
 
 - Native branded setup screen.
 - Android AccountManager integration: Cal45 appears as a system account after successful HTTPS DAV authentication. The authenticator never shares DAV app passwords via Android auth tokens. Removing the account in the Cal45 UI clears both Android account and encrypted local credentials.
@@ -11,8 +11,10 @@ Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with G
 - Credentials are saved **only after a successful test**; passwords encrypted via Android Keystore AES-GCM, with ciphertext and nonce in private app preferences and Android backups disabled.
 - An explicit button deletes stored local credentials.
 - No redirect following, no custom trust-all TLS handling, no external JavaScript or analytics. OkHttp is the one HTTP dependency needed for WebDAV's PROPFIND method.
-- **No synchronization yet**: system account registration is not a ContactsProvider or CalendarProvider sync adapter. An HTTP 207 check alone does not prove complete CalDAV/CardDAV interoperability.
-- The Android UI only accepts Cal45-formatted app tokens beginning with `cal45_` (at least 32 characters). This prevents accidentally entering an ordinary user password, **but does not cryptographically prove that a credential is an app password**.\n- **BLOCKER:** The Go gateway now validates separately issued Cal45 device tokens and removes untrusted identity headers. Issuing tokens remains restricted to the operator CLI; secure web self-service and live compatibility testing are still pending.
+- **First CardDAV contact import:** a real Android ContactsProvider SyncAdapter now discovers CardDAV address books under the authenticated user's Radicale collection and imports **missing** vCards into an Android RawContacts account. Import is started manually from the app after granting Android READ_CONTACTS/WRITE_CONTACTS permissions. No Google Play Services required.
+- **Read-only, import-only:** Existing contacts are not modified, deleted or uploaded. Remote changes, duplicates with pre-existing personal contacts, groups, photos, advanced vCard fields and conflict handling are not synchronized yet. CalendarProvider/CalDAV remains unimplemented.
+- HTTP 207 from the initial credential probe does not by itself prove successful CardDAV discovery or data import.
+- The Android UI only accepts Cal45-formatted app tokens beginning with `cal45_` (at least 32 characters). This prevents accidentally entering an ordinary user password, **but does not cryptographically prove that a credential is an app password**.\n- **BLOCKER:** The Go gateway now validates separately issued Cal45 device tokens and removes untrusted identity headers. The optional Cal45 passkey auth-preview has a device-token web UI, but trusted HTTPS deployment and real device compatibility testing are pending.
 
 ## No Android Studio needed
 
@@ -24,11 +26,23 @@ Debug builds are testing-only. Future installable releases require a durable sig
 
 1. Server-side Cal45 account and device-password management.
 2. Android AccountManager integration and safe device credentials (account scaffolding implemented; no sync adapters yet).
-3. Standards-compliant CardDAV discovery / vCard sync / conflict handling.
+3. CardDAV discovery and initial vCard → Android RawContacts import (first version implemented; update/delete/conflict handling still outstanding).
 4. CalDAV discovery, iCalendar recurrence/timezone processing, incremental sync.
-5. Android ContactsProvider and CalendarProvider integration; SyncAdapters.
-6. Automatic background sync, permissions, security tests and signed releases.
+5. Android ContactsProvider SyncAdapter (initial import implemented), CalendarProvider still outstanding.
+6. Reliable automatic background sync, advanced contact mapping, permissions/security validation and signed releases.
 
 ## Security
 
 The Android Keystore key is local to the installation. Deleting app data or reinstalling clears saved credentials; recover by re-adding the app password. The device-password should be revocable from Cal45's future web UI. The current UI is a development prototype and **not** a production DAV client. Current account storage supports only one Cal45 account per installation; multi-account sync is a later milestone.
+
+
+## Manually import contacts (development build)
+
+1. Set up your HTTPS Cal45 DAV DNS domain and issue a device-specific `cal45_...` app password in Cal45.
+2. In Cal45 Sync, save the domain and app password by running the DAV connection check. This registers the Cal45 system account.
+3. Create an address book inside the Cal45 user collection on the Radicale server, if none exists.
+4. Tap **„Kontakte aus Cal45 importieren (nur lesend)“** and grant Android contacts permissions. The SyncAdapter requests the address-book list over HTTPS and adds new contacts to Android's contacts provider.
+
+For this first version, enter the **DAV root URL** as the server address (for example, `https://dav.example.org/`), not an individual address book. The discovery looks for CardDAV address books under `/USERNAME/`. Requests have strict size/item limits; larger collections may be rejected until incremental paging is implemented. If a collection has more than 200 **new** contact records, the importer fails rather than silently truncating. Existing Cal45-owned raw contacts are skipped on subsequent imports to avoid replacing local edits.
+
+**Back up your contacts before testing.** This is a preliminary parser supporting names, phone numbers and email addresses. It does not download pictures, categories, birthdays, extended address fields or handle remote updates/deletions. System-contact deletion caused by removing the entire Android account is also possible, so use a test address book first. The APK must still pass CI and be tested on GrapheneOS hardware.
