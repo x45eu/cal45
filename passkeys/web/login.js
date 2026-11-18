@@ -30,7 +30,7 @@ function encode(buffer) {
   const bytes = new Uint8Array(buffer);
   let text = "";
   for (const value of bytes) text += String.fromCharCode(value);
-  return btoa(text).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  return btoa(text).split("+").join("-").split("/").join("_").replace(/=+$/g, "");
 }
 function assertionJSON(credential) {
   if (typeof credential.toJSON === "function") return credential.toJSON();
