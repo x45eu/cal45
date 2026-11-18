@@ -54,6 +54,7 @@ object Cal45SystemAccount {
         Cal45BackgroundSync.disable(context)
         val manager = AccountManager.get(context)
         for (account in manager.getAccountsByType(TYPE)) {
+            SyncJournalStore(context, account.name).discard()
             manager.removeAccountExplicitly(account)
         }
     }

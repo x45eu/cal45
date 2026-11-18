@@ -105,6 +105,17 @@ internal class CalendarSyncAdapter(context: Context) :
                     }
                 } ?: throw IllegalStateException("Android-Termine nicht lesbar")
             }
+            val journal = SyncJournalStore(context, account.name)
+            var journalErrors = 0
+            fun note(
+                source: String, state: SyncJournalCodec.State,
+                etag: String?, fingerprint: String?
+            ) {
+                try {
+                    journal.observe(source, SyncJournalCodec.Kind.EVENT,
+                        state, etag, fingerprint)
+                } catch (_: Exception) { journalErrors++ }
+            }
             val remoteEvents = CalDavReader(server, username, password)
                 .fetchChangedEvents(known.mapValues { it.value.etag })
             var imported = 0
@@ -119,6 +130,8 @@ internal class CalendarSyncAdapter(context: Context) :
                 // Recurrence changes and conversions to/from recurrence require
                 // exception-aware reconciliation. Never update them implicitly.
                 if (existing != null && (existing.recurring || event.rrule != null)) {
+                    note(remote.source, SyncJournalCodec.State.BLOCKED,
+                        existing.etag, existing.fingerprint)
                     conflicts++
                     continue
                 }
@@ -126,6 +139,8 @@ internal class CalendarSyncAdapter(context: Context) :
                         existing.etag, remote.etag, existing.fingerprint, existing.fields,
                         existing.dirty, existing.deleted
                     )) {
+                    note(remote.source, SyncJournalCodec.State.CONFLICT,
+                        existing.etag, existing.fingerprint)
                     conflicts++
                     continue
                 }
@@ -163,6 +178,9 @@ internal class CalendarSyncAdapter(context: Context) :
                         syncUri(CalendarContract.Events.CONTENT_URI, account), values
                     )
                     if (result == null) throw IllegalStateException("Termin konnte nicht gespeichert werden")
+                    note(remote.source, SyncJournalCodec.State.IMPORTED,
+                        remote.etag, CalendarChangePolicy.fingerprint(
+                            CalendarChangePolicy.from(event)))
                     imported++
                     syncResult.stats.numInserts++
                 } else {
@@ -184,14 +202,21 @@ internal class CalendarSyncAdapter(context: Context) :
                         )
                     )
                     if (count == 1) {
+                        note(remote.source, SyncJournalCodec.State.IMPORTED,
+                            remote.etag, CalendarChangePolicy.fingerprint(
+                                CalendarChangePolicy.from(event)))
                         updated++
                         syncResult.stats.numUpdates++
-                    } else conflicts++
+                    } else {
+                        note(remote.source, SyncJournalCodec.State.CONFLICT,
+                            existing.etag, existing.fingerprint)
+                        conflicts++
+                    }
                 }
             }
             report("Kalenderabgleich: $imported neu, $updated aktualisiert, " +
                 "$conflicts lokale Konflikte/Altbestände geschützt, " +
-                "$skipped nicht unterstützte Termine.")
+                "$skipped nicht unterstützte Termine, $journalErrors Journalfehler.")
         } catch (_: java.io.IOException) {
             syncResult.stats.numIoExceptions++
             report("CalDAV-Verbindung oder Kalenderabruf fehlgeschlagen.")

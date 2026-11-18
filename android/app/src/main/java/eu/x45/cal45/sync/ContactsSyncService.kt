@@ -73,6 +73,17 @@ internal class ContactsSyncAdapter(context: Context) :
                     )
                 }
             } ?: throw IllegalStateException("Kontakteanbieter nicht verfügbar")
+            val journal = SyncJournalStore(context, account.name)
+            var journalErrors = 0
+            fun note(
+                source: String, state: SyncJournalCodec.State,
+                etag: String?, fingerprint: String?
+            ) {
+                try {
+                    journal.observe(source, SyncJournalCodec.Kind.CONTACT,
+                        state, etag, fingerprint)
+                } catch (_: Exception) { journalErrors++ }
+            }
             val reader = CardDavReader(server, user, password)
             val scan = reader.scanCards(existing.mapValues { it.value.etag })
             var imported = 0
@@ -84,6 +95,8 @@ internal class ContactsSyncAdapter(context: Context) :
                 val parsed = VCardContact.parse(card.text)
                 if (parsed == null) { skipped++; continue }
                 addContact(account, card.source, card.etag, parsed)
+                note(card.source, SyncJournalCodec.State.IMPORTED,
+                    card.etag, ContactChangePolicy.fingerprint(parsed))
                 imported++
                 syncResult.stats.numInserts++
             }
@@ -96,13 +109,19 @@ internal class ContactsSyncAdapter(context: Context) :
                     continue
                 }
                 if (updateContact(account, card.source, card.etag, prior, remote)) {
+                    note(card.source, SyncJournalCodec.State.IMPORTED,
+                        card.etag, ContactChangePolicy.fingerprint(remote))
                     updated++
                     syncResult.stats.numUpdates++
-                } else protected++
+                } else {
+                    note(card.source, SyncJournalCodec.State.CONFLICT,
+                        prior.etag, prior.fingerprint)
+                    protected++
+                }
             }
             report("Kontaktabgleich: $imported neu, $updated sicher aktualisiert, " +
                 "$protected geschützt (lokale Änderung/Altbestand), " +
-                "$skipped nicht unterstützte Karten.")
+                "$skipped nicht unterstützte Karten, $journalErrors Journalfehler.")
         } catch (_: java.io.IOException) {
             syncResult.stats.numIoExceptions++
             report("DAV-Verbindung oder Adressbuchabruf fehlgeschlagen.")
