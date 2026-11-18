@@ -26,7 +26,11 @@ docker compose logs -f gateway web
 - Cal45 preview: http://127.0.0.1:8080/
 - DAV gateway: http://127.0.0.1:8081/ (local test only; Android requires a public HTTPS DNS name)
 
-Issue a device token: `docker compose exec gateway /usr/local/bin/cal45-web token issue alice "Pixel 9a"`; see [Gateway guide](docs/dav-gateway.md).
+Create an active account first: `docker compose exec gateway /usr/local/bin/cal45-web account add alice`.
+
+Then issue its device token: `docker compose exec gateway /usr/local/bin/cal45-web token issue alice "Pixel 9a"`.
+
+Accounts can be disabled without deleting calendars or contacts. See the [Gateway guide](docs/dav-gateway.md) for revocation and re-enabling.
 
 ## Project structure
 
@@ -36,6 +40,7 @@ Issue a device token: `docker compose exec gateway /usr/local/bin/cal45-web toke
 - `web.Dockerfile`: lightweight multi-stage Go build
 - `config/config`: DAV engine trusted-proxy authentication, authorization and storage
 - `docs/frontend.md`: design and security architecture
+- `docs/dav-gateway.md`: operator accounts, app tokens, gateway and migration
 - `assets/cal45-logo.svg`: canonical Cal45 logo
 
 ## Branding
