@@ -5,6 +5,7 @@ import android.accounts.AccountManager
 import android.content.Context
 import android.content.ContentResolver
 import android.provider.ContactsContract
+import android.provider.CalendarContract
 import android.os.Bundle
 import java.net.URI
 import java.util.Locale
@@ -44,6 +45,8 @@ object Cal45SystemAccount {
         }
         ContentResolver.setIsSyncable(account, ContactsContract.AUTHORITY, 1)
         ContentResolver.setSyncAutomatically(account, ContactsContract.AUTHORITY, false)
+        ContentResolver.setIsSyncable(account, CalendarContract.AUTHORITY, 1)
+        ContentResolver.setSyncAutomatically(account, CalendarContract.AUTHORITY, false)
         return account
     }
 
