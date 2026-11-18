@@ -118,6 +118,7 @@ internal object ICalendarEvent {
                 "LOCATION" -> location = unescape(value).take(256)
                 "DTSTART" -> { start = timestamp(rawName, value); startSource = value }
                 "DTEND" -> end = timestamp(rawName, value)
+                "STATUS" -> if (value.equals("CANCELLED", true)) unsupported = true
                 "RRULE" -> {
                     if (recurrenceRaw != null) unsupported = true
                     recurrenceRaw = value
@@ -144,7 +145,11 @@ internal object ICalendarEvent {
             if (until != null) {
                 if (from.allDay && !Regex("[0-9]{8}").matches(until)) return null
                 if (!from.allDay && !Regex("[0-9]{8}T[0-9]{6}Z").matches(until)) return null
-                if (until < source) return null
+                val untilStamp = timestamp(
+                    if (from.allDay) "DTSTART;VALUE=DATE" else "DTSTART", until
+                ) ?: return null
+                if (untilStamp.millis < from.millis ||
+                    untilStamp.millis - from.millis > 732L * 86400000L) return null
             }
             if (SafeRecurrence.androidDuration(to.millis - from.millis, from.allDay) == null)
                 return null
