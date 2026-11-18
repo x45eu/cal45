@@ -4,7 +4,6 @@ import (
  "encoding/json"
  "fmt"
  "os"
- "path/filepath"
 
  "github.com/x45eu/cal45/passkeys"
 )
@@ -45,7 +44,6 @@ func main(){
   fmt.Println("Setup grants revoked:",username)
  default:usage()
  }
- _=filepath.Clean(auth)
 }
 func usage(){
  fmt.Fprintln(os.Stderr,"usage: cal45-passkey-bootstrap issue USER | revoke USER")
