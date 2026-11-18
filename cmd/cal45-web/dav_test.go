@@ -11,6 +11,7 @@ func TestDeviceTokens(t *testing.T) {
  path:=filepath.Join(t.TempDir(),"tokens.json")
  pass:="cal45_"+strings.Repeat("A",43)
  if err:=updateStore(path,func(db *tokenStore)error{
+  db.Accounts=append(db.Accounts,account{Username:"alice",Active:true})
   db.Tokens=append(db.Tokens,deviceToken{ID:"test",Username:"alice",SHA256:tokenHash(pass)})
   return nil
  });err!=nil{t.Fatal(err)}
@@ -32,6 +33,7 @@ func TestGatewayHeaders(t *testing.T) {
  path:=filepath.Join(t.TempDir(),"tokens.json")
  pass:="cal45_"+strings.Repeat("B",43)
  if err:=updateStore(path,func(db *tokenStore)error{
+  db.Accounts=append(db.Accounts,account{Username:"alice",Active:true})
   db.Tokens=append(db.Tokens,deviceToken{ID:"t",Username:"alice",SHA256:tokenHash(pass)});return nil
  });err!=nil{t.Fatal(err)}
  handler,err:=newDAVHandler(backend.URL,path);if err!=nil{t.Fatal(err)}
