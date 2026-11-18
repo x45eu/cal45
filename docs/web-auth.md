@@ -12,7 +12,7 @@ Cal45 includes **unit-tested foundations**, not yet a complete login system:
 
 ## Integration requirements before enabling login
 
-1. WebAuthn/FIDO2 using a maintained library; verify origin, RP ID, challenge expiration, user verification and credential counters.
+1. **Partially implemented:** One-time, account/session-bound passkey ceremony state (see [passkeys.md](passkeys.md)). Still integrate a maintained WebAuthn library and verify the full assertion/registration response including origin, RP ID, challenge, user verification and credential counters.
 2. Store verified passkey credentials and encrypted TOTP enrollment secrets in a durable database.
 3. Server-side atomic, per-account consumption of TOTP counters and recovery-code hashes.
 4. Secure MFA enrollment confirmation, step-up verification, account recovery and session rotation.
