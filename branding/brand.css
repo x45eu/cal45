@@ -1,0 +1,6 @@
+/* Cal45 brand variables - Farben nur hier aendern. */
+:root {
+  --cal45-primary: #4f46e5;
+  --cal45-primary-dark: #3730a3;
+  --cal45-text-on-primary: #ffffff;
+}
