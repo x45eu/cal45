@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Cal45 – Mit Passkey anmelden</title>
+<link rel="stylesheet" href="./login.css">
+<script src="./login.js" defer></script>
+</head>
+<body>
+<main class="panel">
+  <header><div class="mark">▦</div><h1>Cal45</h1><p class="sub">Dein Kalender. Deine Kontakte. Deine Cloud.</p></header>
+  <form id="passkey-form" autocomplete="off">
+    <h2>Mit Passkey anmelden</h2>
+    <p>Bestätige deine Anmeldung mit dem Passkey auf deinem Gerät oder deinem FIDO2-Sicherheitsschlüssel.</p>
+    <label for="username">Cal45-Benutzername</label>
+    <input id="username" name="username" required maxlength="128" autocomplete="username webauthn" spellcheck="false">
+    <button id="sign-in" type="submit">Passkey verwenden</button>
+    <p id="status" aria-live="polite" role="status">Die Anmeldung ist in dieser Entwicklungsansicht noch nicht aktiviert.</p>
+  </form>
+  <footer>Bereitgestellt von Cal45</footer>
+</main>
+</body>
+</html>
