@@ -86,7 +86,7 @@ form.addEventListener("submit", async event => {
     });
     if (!second.ok) throw new Error("Die Passkey-Anmeldung wurde nicht bestätigt.");
     status.textContent = "Passkey erfolgreich bestätigt.";
-    location.assign("/settings");
+    location.assign("/auth/account");
   } catch(error) {
     // Never expose arbitrary server response bodies or sensitive credentials.
     status.textContent = error && error.name === "NotAllowedError"
