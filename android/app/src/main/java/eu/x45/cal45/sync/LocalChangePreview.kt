@@ -94,14 +94,9 @@ internal class LocalChangePreview(private val context: Context) {
                     val series = !cursor.getString(11).isNullOrBlank()
                     // Preview never approves uploads. The specific type of
                     // blocked change is shown to the user instead.
-                    val status = when {
-                        deleted -> "Lokal gelöscht – Upload gesperrt"
-                        series -> "Terminserie – Upload gesperrt"
-                        snapshot == null -> "Älterer Import – Upload gesperrt"
-                        CalendarChangePolicy.fingerprint(local) == snapshot ->
-                            "Kein Unterschied zu importierten Feldern"
-                        else -> "Lokal verändert – Upload noch deaktiviert"
-                    }
+                    val status = LocalChangeStatus.calendar(
+                        snapshot, CalendarChangePolicy.fingerprint(local), deleted, series
+                    )
                     items.add(Item("Termin", cursor.getString(0) ?: "(ohne Titel)", status, false))
                 }
             }
@@ -162,13 +157,10 @@ internal class LocalChangePreview(private val context: Context) {
                     cursor.getString(3)?.matches(Regex("[a-f0-9]{64}")) == true
                 val changed = tracked && cursor.getString(3) !=
                     ContactChangePolicy.fingerprint(parsed)
-                val status = when {
-                    !tracked -> "Älterer Import – Upload gesperrt"
-                    extra || names.size != 1 || phones.size > 10 || emails.size > 10 ->
-                        "Zusätzliche Felder – Upload gesperrt"
-                    changed -> "Lokal verändert – Upload noch deaktiviert"
-                    else -> "Kein Unterschied zu importierten Feldern"
-                }
+                val status = LocalChangeStatus.contact(
+                    tracked, changed, extra,
+                    names.size != 1 || phones.size > 10 || emails.size > 10, false
+                )
                 items.add(Item("Kontakt", parsed.name.ifEmpty { "Kontakt #$id" }, status, false))
             }
         }
