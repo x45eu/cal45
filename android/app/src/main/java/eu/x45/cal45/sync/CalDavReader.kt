@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit
  * No redirects, cross-origin fetch, writes, or unrestricted DAV traversal.
  */
 internal class CalDavReader(server: String, username: String, password: String) {
-    data class RemoteEvent(val calendarUrl: String, val source: String, val text: String)
-    data class Resource(val href: String, val calendar: Boolean)
+    data class RemoteEvent(val calendarUrl: String, val source: String, val text: String, val etag: String?)
+    data class Resource(val href: String, val calendar: Boolean, val etag: String?)
     private val root = URI(DavProbe.normalizedUrl(server)
         ?: throw IOException("Nur HTTPS-Domains sind erlaubt"))
     private val owner: URI
@@ -61,16 +61,17 @@ internal class CalDavReader(server: String, username: String, password: String) 
         return resolved
     }
 
-    private fun read(url: URI, method: String, maximum: Int): String {
+    private fun read(url: URI, method: String, maximum: Int, ifMatch: String? = null): String {
         if (!allowed(url)) throw IOException("Ungültige Kalenderadresse")
         val builder = Request.Builder().url(url.toASCIIString())
             .header("Authorization", authorization)
             .header("Accept", if (method == "GET") "text/calendar" else "application/xml")
+        if (method == "GET" && ifMatch != null) builder.header("If-Match", ifMatch)
         val request = if (method == "PROPFIND") {
             builder.method(method, """
                 <?xml version="1.0" encoding="utf-8"?>
                 <d:propfind xmlns:d="DAV:">
-                  <d:prop><d:resourcetype/></d:prop>
+                  <d:prop><d:resourcetype/><d:getetag/></d:prop>
                 </d:propfind>
             """.trimIndent().toRequestBody("application/xml; charset=utf-8".toMediaType()))
                 .header("Depth", "1").build()
@@ -94,7 +95,7 @@ internal class CalDavReader(server: String, username: String, password: String) 
         }
     }
 
-    fun fetchNewEvents(existing: Set<String>, maximum: Int = 200): List<RemoteEvent> {
+    fun fetchChangedEvents(existing: Map<String, String?>, maximum: Int = 200): List<RemoteEvent> {
         require(maximum in 1..200)
         val calendars = parseMultistatus(read(owner, "PROPFIND", 2 * 1024 * 1024))
             .filter { it.calendar }.map { child(it.href) }.distinct()
@@ -108,9 +109,16 @@ internal class CalDavReader(server: String, username: String, password: String) 
                 if (!uri.rawPath.startsWith(calendar.rawPath) ||
                     resource.calendar || !uri.rawPath.endsWith(".ics", ignoreCase = true)) continue
                 val source = uri.toASCIIString()
-                if (source in existing || !visited.add(source)) continue
+                if (!visited.add(source)) continue
+                val etag = safeStrongETag(resource.etag)
+                // Legacy imports without a saved ETag must never be overwritten.
+                if (source in existing && (etag == null || existing[source] == null ||
+                    existing[source] == etag)) continue
                 if (events.size >= maximum) throw IOException("Mehr als $maximum neue Termine")
-                events.add(RemoteEvent(calendar.toASCIIString(), source, read(uri, "GET", 256 * 1024)))
+                events.add(RemoteEvent(
+                    calendar.toASCIIString(), source,
+                    read(uri, "GET", 256 * 1024, etag), etag
+                ))
             }
         }
         return events
@@ -128,6 +136,7 @@ internal class CalDavReader(server: String, username: String, password: String) 
             var inResponse = false
             var href: String? = null
             var isCalendar = false
+            var etag: String? = null
             var event = parser.eventType
             while (event != XmlPullParser.END_DOCUMENT) {
                 if (event == XmlPullParser.START_TAG) {
@@ -136,15 +145,18 @@ internal class CalDavReader(server: String, username: String, password: String) 
                             inResponse = true
                             href = null
                             isCalendar = false
+                            etag = null
                         }
                         inResponse && parser.namespace == "DAV:" && parser.name == "href" ->
                             href = parser.nextText()
+                        inResponse && parser.namespace == "DAV:" && parser.name == "getetag" ->
+                            etag = parser.nextText()
                         inResponse && parser.namespace == "urn:ietf:params:xml:ns:caldav" &&
                             parser.name == "calendar" -> isCalendar = true
                     }
                 } else if (event == XmlPullParser.END_TAG &&
                     parser.namespace == "DAV:" && parser.name == "response") {
-                    href?.let { resources.add(Resource(it, isCalendar)) }
+                    href?.let { resources.add(Resource(it, isCalendar, etag)) }
                     if (resources.size > 1000) throw IOException("Zu viele CalDAV-Ressourcen")
                     inResponse = false
                 }
