@@ -15,7 +15,8 @@ import android.provider.CalendarContract
 
 /**
  * Manual, remote-to-local import of standalone CalDAV CalendarContract.Events.
- * Never uploads, updates or deletes events, even when remote data changes.
+ * Updates only clean, fingerprint-matching imported events with strong ETags.
+ * Never uploads or deletes events; legacy and locally edited entries stay untouched.
  */
 internal class CalendarSyncAdapter(context: Context) :
     AbstractThreadedSyncAdapter(context, true, false) {
@@ -62,32 +63,69 @@ internal class CalendarSyncAdapter(context: Context) :
                 }
             } ?: throw IllegalStateException("Android-Kalenderanbieter nicht erreichbar")
 
-            // Source IDs are full HTTPS resource URLs; previously imported
-            // events stay untouched even if a server-side event changes.
-            val known = HashSet<String>()
+            data class Imported(
+                val id: Long,
+                val etag: String?,
+                val fingerprint: String?,
+                val fields: CalendarChangePolicy.Fields,
+                val dirty: Boolean,
+                val deleted: Boolean
+            )
+            // Legacy imports have no ETag/snapshot and cannot be overwritten.
+            val known = HashMap<String, Imported>()
+            val cols = arrayOf(
+                CalendarContract.Events._ID, CalendarContract.Events.SYNC_DATA1,
+                CalendarContract.Events.SYNC_DATA2, CalendarContract.Events.SYNC_DATA3,
+                CalendarContract.Events.TITLE, CalendarContract.Events.DTSTART,
+                CalendarContract.Events.DTEND, CalendarContract.Events.ALL_DAY,
+                CalendarContract.Events.DESCRIPTION, CalendarContract.Events.EVENT_LOCATION,
+                CalendarContract.Events.DIRTY, CalendarContract.Events.DELETED
+            )
             for (calendarId in allCalendars.values) {
                 context.contentResolver.query(
-                    CalendarContract.Events.CONTENT_URI,
-                    arrayOf(CalendarContract.Events.SYNC_DATA1),
+                    CalendarContract.Events.CONTENT_URI, cols,
                     "${CalendarContract.Events.CALENDAR_ID}=?",
                     arrayOf(calendarId.toString()), null
                 )?.use { cursor ->
                     while (cursor.moveToNext()) {
-                        cursor.getString(0)?.let { known.add(it) }
+                        val source = cursor.getString(1) ?: continue
+                        known[source] = Imported(
+                            cursor.getLong(0), cursor.getString(2), cursor.getString(3),
+                            CalendarChangePolicy.Fields(
+                                cursor.getString(4) ?: "",
+                                cursor.getLong(5), cursor.getLong(6),
+                                cursor.getInt(7) == 1,
+                                cursor.getString(8) ?: "", cursor.getString(9) ?: ""
+                            ),
+                            cursor.getInt(10) != 0, cursor.getInt(11) != 0
+                        )
                     }
                 } ?: throw IllegalStateException("Android-Termine nicht lesbar")
             }
-            val newEvents = CalDavReader(server, username, password).fetchNewEvents(known)
+            val remoteEvents = CalDavReader(server, username, password)
+                .fetchChangedEvents(known.mapValues { it.value.etag })
             var imported = 0
+            var updated = 0
+            var conflicts = 0
             var skipped = 0
-            for (remote in newEvents) {
+            for (remote in remoteEvents) {
                 if (Thread.currentThread().isInterrupted) break
                 val event = ICalendarEvent.parse(remote.text)
                 if (event == null) { skipped++;continue }
-                val calendarId = allCalendars[remote.calendarUrl]
-                    ?: createCalendar(account, remote.calendarUrl).also {
-                        allCalendars[remote.calendarUrl] = it
-                    }
+                val existing = known[remote.source]
+                if (existing != null && !CalendarChangePolicy.mayUpdate(
+                        existing.etag, remote.etag, existing.fingerprint, existing.fields,
+                        existing.dirty, existing.deleted
+                    )) {
+                    conflicts++
+                    continue
+                }
+                val calendarId = if (existing == null) {
+                    allCalendars[remote.calendarUrl]
+                        ?: createCalendar(account, remote.calendarUrl).also {
+                            allCalendars[remote.calendarUrl] = it
+                        }
+                } else 0L
                 val values = ContentValues().apply {
                     put(CalendarContract.Events.CALENDAR_ID, calendarId)
                     put(CalendarContract.Events.TITLE, event.title)
@@ -98,14 +136,45 @@ internal class CalendarSyncAdapter(context: Context) :
                     put(CalendarContract.Events.DESCRIPTION, event.description)
                     put(CalendarContract.Events.EVENT_LOCATION, event.location)
                     put(CalendarContract.Events.SYNC_DATA1, remote.source)
+                    put(CalendarContract.Events.SYNC_DATA2, remote.etag)
+                    put(CalendarContract.Events.SYNC_DATA3,
+                        CalendarChangePolicy.fingerprint(CalendarChangePolicy.from(event)))
                     put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CONFIRMED)
                 }
-                val result = context.contentResolver.insert(syncUri(CalendarContract.Events.CONTENT_URI, account), values)
-                if (result == null) throw IllegalStateException("Termin konnte nicht gespeichert werden")
-                imported++
-                syncResult.stats.numInserts++
+                if (existing == null) {
+                    val result = context.contentResolver.insert(
+                        syncUri(CalendarContract.Events.CONTENT_URI, account), values
+                    )
+                    if (result == null) throw IllegalStateException("Termin konnte nicht gespeichert werden")
+                    imported++
+                    syncResult.stats.numInserts++
+                } else {
+                    // The provider verifies source, previous ETag and not-dirty
+                    // state again at update time, rejecting concurrent changes.
+                    values.remove(CalendarContract.Events.CALENDAR_ID)
+                    values.remove(CalendarContract.Events.STATUS)
+                    val count = context.contentResolver.update(
+                        syncUri(CalendarContract.Events.CONTENT_URI, account),
+                        values,
+                        "${CalendarContract.Events._ID}=? AND " +
+                            "${CalendarContract.Events.SYNC_DATA1}=? AND " +
+                            "${CalendarContract.Events.SYNC_DATA2}=? AND " +
+                            "${CalendarContract.Events.DIRTY}=0 AND " +
+                            "${CalendarContract.Events.DELETED}=0",
+                        arrayOf(
+                            existing.id.toString(), remote.source,
+                            existing.etag ?: ""
+                        )
+                    )
+                    if (count == 1) {
+                        updated++
+                        syncResult.stats.numUpdates++
+                    } else conflicts++
+                }
             }
-            report("Kalenderimport abgeschlossen: $imported neue Termine, $skipped komplexe Einträge übersprungen.")
+            report("Kalenderabgleich: $imported neu, $updated aktualisiert, " +
+                "$conflicts lokale Konflikte/Altbestände geschützt, " +
+                "$skipped nicht unterstützte Termine.")
         } catch (_: java.io.IOException) {
             syncResult.stats.numIoExceptions++
             report("CalDAV-Verbindung oder Kalenderabruf fehlgeschlagen.")
