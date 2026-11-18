@@ -28,3 +28,12 @@ jobs:
         run: |
           node --check login.js
           node --check enroll.js
+          node --check account.js
+      - name: Validate auth-preview Compose configuration
+        working-directory: .
+        env:
+          CAL45_AUTH_ORIGIN: https://cal.example.org
+        run: docker compose --profile auth-preview config --quiet
+      - name: Build Cal45 auth-preview container
+        working-directory: .
+        run: docker build -f passkeys/Dockerfile -t cal45-auth-ci .
