@@ -1,0 +1,45 @@
+{{define "index.html"}}<!doctype html>
+<html lang="de">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="theme-color" content="#19222C">
+ <title>{{.Title}} – Cal45</title>
+ <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+ <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<div class="shell">
+ <aside class="sidebar">
+  <a class="brand" href="/" aria-label="Cal45 Startseite"><img src="/static/logo.svg" alt="Cal45"></a>
+  <p class="product-subtitle">Kalender &amp; Kontakte</p>
+  <nav aria-label="Hauptnavigation">
+   <a href="/" {{if eq .Active "calendar"}}aria-current="page"{{end}}>▦ <span>Kalender</span></a>
+   <a href="/contacts" {{if eq .Active "contacts"}}aria-current="page"{{end}}>♙ <span>Kontakte</span></a>
+   <a href="/settings" {{if eq .Active "settings"}}aria-current="page"{{end}}>⚙ <span>Einstellungen</span></a>
+  </nav>
+  <div class="sidebar-bottom"><span class="dot"></span> Cal45 · Entwicklungsstand<br><small>Kein Benutzerkonto verbunden</small></div>
+ </aside>
+ <main class="main">
+  <header class="topline"><div><p class="eyebrow">CAL45 WORKSPACE</p><h1>{{.Title}}</h1></div><span class="preview">UI-Vorschau</span></header>
+  {{if eq .Active "calendar"}}
+  <section class="banner" role="status"><strong>Kalender – Designvorschau</strong><p>Dies ist die erste echte Go-Oberfläche. Termine und Synchronisierung werden im nächsten Schritt angebunden.</p></section>
+  <section class="calendar">
+   <div class="calendar-header"><h2>Kalenderübersicht</h2><span class="muted">Noch keine Kalender verbunden</span></div>
+   <div class="week"><span>Mo</span><span>Di</span><span>Mi</span><span>Do</span><span>Fr</span><span>Sa</span><span>So</span></div>
+   <div class="cells" aria-label="Gestaltungsvorschau einer Kalenderwoche"><div><b>16</b></div><div><b>17</b></div><div><b>18</b><span class="today">Heute</span></div><div><b>19</b></div><div><b>20</b></div><div class="weekend"><b>21</b></div><div class="weekend"><b>22</b></div></div>
+  </section>
+  {{else}}
+  <section class="banner"><strong>{{.Title}} – in Entwicklung</strong><p>{{.Description}}</p></section>
+  {{if eq .Active "settings"}}
+   <section class="feature-grid">
+    <article><h2>Passkeys</h2><p>Geplant: WebAuthn mit Herkunftsprüfung, Challenge-Bindung und Geräteverwaltung.</p><span class="notready">Noch nicht verfügbar</span></article>
+    <article><h2>Authenticator-App (TOTP)</h2><p>Geplant: Einmalcodes mit Anti-Replay und geschützten Wiederherstellungscodes.</p><span class="notready">Noch nicht verfügbar</span></article>
+    <article><h2>Anmeldeschutz</h2><p>Geplant: geschützte Sessions, CSRF-Schutz, Login-Drosselung und sichere Wiederherstellung.</p><span class="notready">Noch nicht verfügbar</span></article>
+   </section>
+  {{end}}
+  {{end}}
+  <footer>Bereitgestellt von Cal45 · <span class="muted">Vorschau ohne Benutzeranmeldung</span></footer>
+ </main>
+</div>
+</body></html>{{end}}

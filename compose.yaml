@@ -2,7 +2,7 @@ name: cal45
 
 services:
   cal45:
-    # Upstream DAV engine (internal implementation detail).
+    # DAV backend is reachable only from the host on loopback.
     image: ghcr.io/kozea/radicale:stable
     restart: unless-stopped
     ports:
@@ -10,3 +10,11 @@ services:
     volumes:
       - ./config:/etc/radicale:ro
       - ./data:/var/lib/radicale
+
+  web:
+    build:
+      context: .
+      dockerfile: web.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"

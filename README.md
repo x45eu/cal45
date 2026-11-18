@@ -2,72 +2,56 @@
 
 ![Cal45 logo](assets/cal45-logo.svg)
 
-**Cal45** – Dein Kalender. Deine Kontakte. Deine Cloud.
+**Cal45 – Dein Kalender. Deine Kontakte. Deine Cloud.**
 
-Cal45 is a self-hosted CalDAV/CardDAV service.
+Cal45 is a lightweight, self-hosted CalDAV/CardDAV service with a standalone Go frontend and a separate DAV backend.
 
-**Status:** v0.1 foundation. The repository currently contains the DAV engine and its configuration, but **not yet a custom calendar or contacts frontend**.
+## Current status
 
-## Branding
+- Go HTML/CSS frontend: **initial design preview available** (no login, no live calendar sync).
+- DAV backend: Radicale, using htpasswd and owner-only rights.
+- Passkeys/TOTP: **planned; not implemented yet**. See [Frontend architecture and security roadmap](docs/frontend.md).
+- Both ports are bound to loopback by default; **not ready for public production use**.
 
-All **user-facing Cal45 UI** should use the Cal45 name and visual identity. Approved example copy:
-
-- Application title: **Cal45**
-- Service description: **CalDAV / CardDAV**
-- Footer: **Bereitgestellt von Cal45**
-- No backend product name or attribution footer in normal user-facing navigation or screens.
-
-Brand palette (shared with Media45): `#60A5FA` (blue), `#D4DBE5` (light), `#19222C` (dark).
-Logo: [assets/cal45-logo.svg](assets/cal45-logo.svg).
-
-**Note:** The image mockup is not an implemented frontend. The current container still serves the upstream DAV engine's default web UI, which may contain its own branding. Replacing that requires implementing and serving our custom Cal45 frontend.
-
-## Requirements
-
-- Docker Engine with Docker Compose plugin
-- `htpasswd` (often installed via `apache2-utils`)
-
-## First start
+## Quick start (local only)
 
 ```bash
 git clone https://github.com/x45eu/cal45.git
 cd cal45
 mkdir -p data
 htpasswd -B -c config/users YOUR_USERNAME
-docker compose up -d
-docker compose logs -f cal45
+docker compose up -d --build
+docker compose logs -f web
 ```
 
-For additional accounts (without `-c`, which would overwrite the file):
+- Cal45 preview: http://127.0.0.1:8080/
+- DAV backend: http://127.0.0.1:5232/ (for compatible clients, on localhost only)
 
-```bash
-htpasswd -B config/users ANOTHER_USERNAME
-```
+For more users: `htpasswd -B config/users ANOTHER_USERNAME` (do not use `-c` again).
 
-The DAV endpoint is available locally at **http://127.0.0.1:5232/**. Use your username and password in a compatible CalDAV/CardDAV client. The underlying DAV engine's built-in web interface supports creating calendars and address books; a branded Cal45 client is still planned.
+## Project structure
 
-## Security
+- `cmd/cal45-web/`: server-side Go application
+- `cmd/cal45-web/templates/`: accessible HTML templates
+- `cmd/cal45-web/static/`: local CSS and brand assets
+- `web.Dockerfile`: lightweight multi-stage Go build
+- `config/config`: DAV engine authentication, authorization and storage
+- `docs/frontend.md`: design and security architecture
+- `assets/cal45-logo.svg`: canonical Cal45 logo
 
-- The Compose port is bound to loopback only. **Do not expose raw HTTP/5232 to the public Internet.**
-- To access Cal45 remotely, put it behind an HTTPS reverse proxy with appropriate forwarding headers and authentication passthrough. Keep the DAV backend inaccessible except from the proxy.
-- Password hashes live in `config/users` and are excluded from git. Never commit credentials or user data.
-- `owner_only` rights isolate users' collections. Review authorization carefully before implementing sharing.
-- Back up `data/` and securely back up account configuration. Test restoration.
-- The `stable` image tag follows upstream releases. Pin and test a specific version/digest for production.
+## Branding
 
-### Existing deployments
+- Blue `#60A5FA`, light gray `#D4DBE5`, navy `#19222C`.
+- User-facing UI says **Cal45** and **Bereitgestellt von Cal45**.
+- No trackers, CDNs, npm, or UI framework.
+- The standalone DAV engine still has its own default web interface if accessed directly. This will be removed from user-facing routes when a production reverse proxy is introduced.
 
-The Docker Compose service was renamed from `radicale` to `cal45`. On an existing deployment, `docker compose up -d` will replace the old service container; the bind-mounted `data/` directory stays unchanged. **Back up data before upgrading** and check the new service logs via `docker compose logs cal45`.
+## Production security requirements
 
-## Planned work
+**Do not deploy publicly in its current state.** There is no authenticated Cal45 web user session or account administration yet. WebAuthn/TOTP screens are informational only. Refer to [docs/frontend.md](docs/frontend.md) for concrete security acceptance criteria, including sharing identities with DAV clients.
 
-1. HTTPS reverse proxy / deployment guide
-2. Branded Cal45 frontend for calendars, contacts, and settings
-3. Optional account administration without bypassing the underlying auth/rights model
-4. Automated tests, backup/restore, client compatibility checks
+## Credits and licensing
 
-## Credits and licensing (technical/legal attribution)
+Cal45 uses [Radicale](https://github.com/Kozea/Radicale) as a separate upstream component. Radicale is GPL-3.0 licensed; preserve notices and meet applicable licensing obligations when redistributing or modifying it.
 
-Cal45 uses [Radicale](https://github.com/Kozea/Radicale) as its external DAV server component. Radicale is open-source software licensed under GPL-3.0. Respect its license, notices, and attribution obligations if redistributing it or modified versions.
-
-No custom Cal45 application code license has been selected yet.
+No license for original Cal45 application code has been selected yet.

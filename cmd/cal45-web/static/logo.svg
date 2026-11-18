@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 240" role="img" aria-labelledby="title desc">
+  <title id="title">Cal45</title>
+  <desc id="desc">Calendar with synchronization arrows, followed by Cal45 wordmark.</desc>
+  <!-- Transparent background. Brand colors shared with Media45. -->
+  <g transform="translate(18 18)">
+    <path d="M36 36H166A24 24 0 0 1 190 60V165M36 36A24 24 0 0 0 12 60V184A24 24 0 0 0 36 208H122" fill="none" stroke="#D4DBE5" stroke-width="17" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M22 72V60A24 24 0 0 1 46 36H156A24 24 0 0 1 180 60V72Z" fill="#60A5FA"/>
+    <path d="M62 12V48M140 12V48" stroke="#D4DBE5" stroke-width="17" stroke-linecap="round"/>
+    <g fill="#D4DBE5">
+      <rect x="44" y="96" width="26" height="26" rx="6"/>
+      <rect x="85" y="96" width="26" height="26" rx="6"/>
+      <rect x="126" y="96" width="26" height="26" rx="6"/>
+      <rect x="44" y="137" width="26" height="26" rx="6"/>
+      <rect x="85" y="137" width="26" height="26" rx="6"/>
+    </g>
+    <g fill="none" stroke="#60A5FA" stroke-width="14" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M126 161a43 43 0 0 1 73-14"/>
+      <path d="m188 133 14 15-21 1"/>
+      <path d="M204 173a43 43 0 0 1-73 14"/>
+      <path d="m142 201-14-15 21-1"/>
+    </g>
+  </g>
+  <text x="250" y="179" fill="#D4DBE5" font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="700" letter-spacing="-7">Cal</text>
+  <text x="490" y="179" fill="#60A5FA" font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="700" letter-spacing="-8">45</text>
+</svg>
