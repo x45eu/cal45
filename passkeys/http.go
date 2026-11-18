@@ -15,12 +15,18 @@ import (
 // No route is registered if this callback is absent.
 type LoginSessionIssuer func(http.ResponseWriter,*http.Request,string)error
 
+// RegistrationAuthorizer must require a fully authenticated, recently
+// reverified web session and return its unforgeable server-issued binding.
+// A merely enabled account is NOT sufficient authorization.
+type RegistrationAuthorizer func(*http.Request)(username,sessionBinding string,err error)
+
 // Endpoint is the opt-in browser adapter; it is NOT automatically installed
 // into the Cal45 preview and is NOT a replacement for secure onboarding.
 type Endpoint struct{
  Service *Service
  Origin string
  IssueSession LoginSessionIssuer
+ AuthorizeRegistration RegistrationAuthorizer
 }
 
 // Register explicitly opt-ins handlers to the given mux. The invoking server
@@ -32,6 +38,12 @@ func(e *Endpoint)Register(mux *http.ServeMux)error{
  if _,err:=ValidOrigin(e.Origin);err!=nil{return err}
  mux.HandleFunc("POST /auth/passkey/login/begin",e.begin)
  mux.HandleFunc("POST /auth/passkey/login/finish",e.finish)
+ // Registration routes can only be installed when a strict step-up
+ // authorization provider is supplied by the embedding application.
+ if e.AuthorizeRegistration!=nil {
+  mux.HandleFunc("POST /auth/passkey/register/begin",e.registerBegin)
+  mux.HandleFunc("POST /auth/passkey/register/finish",e.registerFinish)
+ }
  return nil
 }
 const loginCookie="__Host-cal45_passkey_challenge"
@@ -101,4 +113,32 @@ func(e *Endpoint)finish(w http.ResponseWriter,r *http.Request){
  w.Header().Set("Content-Type","application/json; charset=utf-8")
  w.WriteHeader(http.StatusOK)
  w.Write([]byte("{\"authenticated\":true}"))
+}
+
+func(e *Endpoint)registerBegin(w http.ResponseWriter,r *http.Request){
+ if !e.checkRequest(r){fail(w,http.StatusForbidden);return}
+ user,binding,err:=e.AuthorizeRegistration(r)
+ if err!=nil||user==""||len(binding)<32{fail(w,http.StatusUnauthorized);return}
+ options,handle,err:=e.Service.BeginRegistration(user,binding)
+ if err!=nil{fail(w,http.StatusForbidden);return}
+ w.Header().Set("Cache-Control","no-store")
+ w.Header().Set("Content-Type","application/json; charset=utf-8")
+ json.NewEncoder(w).Encode(struct{
+  Ceremony string `json:"ceremony"`
+  Options any `json:"options"`
+ }{Ceremony:handle,Options:options})
+}
+func(e *Endpoint)registerFinish(w http.ResponseWriter,r *http.Request){
+ if !e.checkRequest(r){fail(w,http.StatusForbidden);return}
+ user,binding,err:=e.AuthorizeRegistration(r)
+ if err!=nil||user==""||len(binding)<32{fail(w,http.StatusUnauthorized);return}
+ ceremony:=r.Header.Get("X-Cal45-Ceremony")
+ if ceremony==""||len(ceremony)>96{fail(w,http.StatusBadRequest);return}
+ r.Body=http.MaxBytesReader(w,r.Body,64*1024)
+ if err:=e.Service.FinishRegistration(user,binding,ceremony,r);err!=nil{
+  fail(w,http.StatusForbidden);return
+ }
+ w.Header().Set("Content-Type","application/json; charset=utf-8")
+ w.Header().Set("Cache-Control","no-store")
+ w.Write([]byte("{\"registered\":true}"))
 }
