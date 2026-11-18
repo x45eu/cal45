@@ -125,6 +125,15 @@ internal class CalDavReader(server: String, username: String, password: String) 
     }
 
     companion object {
+        // Strong HTTP ETags can be used with If-Match; weak tags cannot.
+        fun safeStrongETag(value: String?): String? {
+            if (value == null || value.length !in 3..182 ||
+                !value.startsWith('"') || !value.endsWith('"')) return null
+            val middle = value.substring(1, value.length - 1)
+            if (middle.any { it == '"' || it.code < 32 || it.code == 127 }) return null
+            return value
+        }
+
         fun parseMultistatus(xml: String): List<Resource> {
             if (xml.length > 2 * 1024 * 1024 ||
                 xml.contains("<!DOCTYPE", true) || xml.contains("<!ENTITY", true)) {
