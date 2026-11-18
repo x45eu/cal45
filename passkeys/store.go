@@ -129,7 +129,7 @@ func(r *JSONRepository)SaveVerifiedCredential(username string,credential *webaut
     // Reject counter rollback; zero is allowed for authenticators without
     // monotonic counters, consistent with WebAuthn.
     if credential.Authenticator.SignCount!=0&&
-      u.Credentials[i].Authenticator.SignCount>credential.Authenticator.SignCount{
+      u.Credentials[i].Authenticator.SignCount>=credential.Authenticator.SignCount{
      return ErrUnavailable
     }
     u.Credentials[i]=*credential
