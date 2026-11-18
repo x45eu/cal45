@@ -10,7 +10,7 @@ Cal45 is a lightweight, self-hosted CalDAV/CardDAV service with a standalone Go 
 
 - Go HTML/CSS frontend: **initial design preview available** (no login, no live calendar sync).
 - DAV backend: Radicale isolated behind a Go app-password gateway, with owner-only rights.
-- Passkeys: **single-use, HTTPS-domain-bound ceremony state implemented**, but no cryptographic WebAuthn verification or login is active. TOTP, recovery and web-session primitives exist but remain unconnected. See [Web authentication roadmap](docs/web-auth.md).
+- Passkeys: **cryptographic WebAuthn verification and persistent credential storage now implemented in the isolated `passkeys/` Go module**, but this module is not connected to the web server; no usable passkey login is active. TOTP, recovery and web-session primitives exist but remain unconnected. See [Web authentication roadmap](docs/web-auth.md).
 - The UI and DAV gateway bind only to loopback; the DAV engine has no host port. **Not ready for public production use**.
 
 ## Quick start (local only)
@@ -42,6 +42,7 @@ Accounts can be disabled without deleting calendars or contacts. See the [Gatewa
 - `docs/frontend.md`: design and security architecture
 - `docs/web-auth.md`: TOTP, sessions, and WebAuthn integration requirements
 - `docs/passkeys.md`: passkey ceremony state and security boundaries
+- `passkeys/`: separate WebAuthn verification module and durable credential store (not yet connected to web login)
 - `docs/dav-gateway.md`: operator accounts, app tokens, gateway and migration
 - `assets/cal45-logo.svg`: canonical Cal45 logo
 

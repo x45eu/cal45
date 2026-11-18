@@ -16,3 +16,10 @@ Passkey enrollment must require a preauthenticated account and successful reauth
 State is currently in-memory and will be lost on restart; only suitable as an isolated building block. Do not serve it from a public endpoint until session integration, persistent credential storage, MFA policy, rate limiting and reverse proxy security are complete. The app-token management web UI remains disabled.
 
 See also [web authentication roadmap](web-auth.md).
+
+
+## November 2026 implementation update
+
+The isolated [passkeys Go module](../passkeys/README.md) now uses `go-webauthn/webauthn` v0.18.2 for actual WebAuthn registration and assertion signature verification, with user verification required. It also provides a file-backed account-bound credential store (stable random handles, credential uniqueness, counter updates and account disable checks), but **it has no publicly exposed web routes**.
+
+Next integration gates: (1) strongly authorized initial enrollment and recovery, (2) exact TLS origin and session-binding middleware, (3) browser ceremony handlers and user verification, (4) MFA/session policies, (5) verified self-service device management. The isolated module CI runs `go mod tidy`, `go test -race` and `go vet`; its outcome is not yet confirmed, and dependency checksums still need to be committed.
