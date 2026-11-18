@@ -9,6 +9,8 @@ import (
  "path/filepath"
  "strings"
  "testing"
+
+ "github.com/go-webauthn/webauthn/webauthn"
 )
 func enrollmentFixture(t *testing.T)(*InitialEnrollment,string){
  t.Helper()
@@ -87,4 +89,18 @@ func TestEnrollmentCrossOriginRejectedWithoutConsumingToken(t *testing.T){
  if rec.Code!=403{t.Fatal("cross origin accepted")}
  rec=httptest.NewRecorder();mux.ServeHTTP(rec,enrollRequest(string(body)))
  if rec.Code!=200{t.Fatalf("valid request rejected after cross origin: %d",rec.Code)}
+}
+
+func TestBootstrapCannotAddSecondPasskey(t *testing.T){
+ e,token:=enrollmentFixture(t)
+ if err:=e.Repository.InitializeHandle("alice");err!=nil{t.Fatal(err)}
+ if err:=e.Repository.SaveNewCredential("alice",&webauthn.Credential{ID:[]byte("already-registered")});err!=nil{t.Fatal(err)}
+ mux:=http.NewServeMux()
+ if err:=e.Register(mux);err!=nil{t.Fatal(err)}
+ data,_:=json.Marshal(map[string]string{"username":"alice","setupToken":token})
+ response:=httptest.NewRecorder()
+ mux.ServeHTTP(response,enrollRequest(string(data)))
+ if response.Code!=http.StatusForbidden{
+  t.Fatalf("initial setup granted to account with passkey: %d",response.Code)
+ }
 }
