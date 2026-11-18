@@ -25,3 +25,8 @@ The browser login screen is in [web/](web/). The opt-in HTTP adapter requires a 
 ## Initial passkey provisioning
 
 The operator-only helper in [`cmd/cal45-passkey-bootstrap`](cmd/cal45-passkey-bootstrap) generates 10-minute, one-use enrollment grants for previously provisioned active Cal45 accounts. Grant storage uses file locking and never persists plaintext tokens. See [BOOTSTRAP.md](BOOTSTRAP.md). The browser registration route is **not yet wired to this grant**. No public enrollment has been enabled.
+
+
+## First-passkey enrollment integration
+
+The isolated module now includes opt-in first-enrollment handlers and a Cal45-branded browser screen. An operator-generated single-use ten-minute setup secret is redeemed via an origin-checked JSON POST, followed by a 120-second cookie-bound WebAuthn registration ceremony. The adapter does not mint a login session, and cannot be used to add a second passkey to an enrolled account. **The running preview does not register these endpoints or serve the enrollment page.** See [ENROLLMENT_HTTP.md](ENROLLMENT_HTTP.md) for outstanding deployment security requirements.

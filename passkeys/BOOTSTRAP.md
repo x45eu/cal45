@@ -20,6 +20,9 @@ On the server, configure `CAL45_TOKEN_FILE` and `CAL45_BOOTSTRAP_FILE` paths, th
 
 The one-time setup secret is printed once to stdout. Do not put the token in GitHub logs, a URL or a browser history entry. Store the private `bootstrap.json` on protected durable storage.
 
-**Not yet integrated into the running Cal45 server.** This is a secure grant issuing/consumption building block, not a functioning browser enrollment path. A finished browser route must (1) validate and consume the token once, (2) bind subsequent WebAuthn registration steps to a Secure/HttpOnly browser cookie and one-time ceremony, (3) verify the WebAuthn attestation/signature and user-verification policy, (4) persist the credential and (5) never create a session based on the setup token alone. Server-side rate limiting and account-recovery controls remain required. Never expose this CLI as an HTTP endpoint.
+**Not yet integrated into the running Cal45 server.** The opt-in HTTP enrollment adapter and static browser screen are now implemented in this isolated module, but remain unregistered/unserved in the current application. A finished browser route must (1) validate and consume the token once, (2) bind subsequent WebAuthn registration steps to a Secure/HttpOnly browser cookie and one-time ceremony, (3) verify the WebAuthn attestation/signature and user-verification policy, (4) persist the credential and (5) never create a session based on the setup token alone. Server-side rate limiting and account-recovery controls remain required. Never expose this CLI as an HTTP endpoint.
 
 The existing Cal45 web preview remains unchanged.
+
+
+The first-enrollment HTTP adapter and user-facing screen are documented in [ENROLLMENT_HTTP.md](ENROLLMENT_HTTP.md). These components remain off in the running frontend until production TLS/origin validation, rate limiting, end-to-end tests, and final session/authorization integration are reviewed.
