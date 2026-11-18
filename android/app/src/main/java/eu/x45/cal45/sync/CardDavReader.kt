@@ -23,7 +23,8 @@ internal class CardDavReader(
     private val username: String,
     private val password: String
 ) {
-    data class RemoteCard(val source: String, val text: String)
+    data class RemoteCard(val source: String, val text: String, val etag: String?)
+    data class Scan(val newCards: List<RemoteCard>, val changedExisting: Int)
     data class DavResource(val href: String, val addressBook: Boolean, val etag: String?)
     private val client = OkHttpClient.Builder()
         .followRedirects(false)
@@ -105,7 +106,7 @@ internal class CardDavReader(
         return parseMultistatus(xml)
     }
 
-    fun fetchNewCards(knownSources: Set<String>, maximum: Int = 200): List<RemoteCard> {
+    fun scanCards(knownSources: Map<String, String?>, maximum: Int = 200): Scan {
         require(maximum in 1..200)
         val books = propfind(ownerHome)
             .filter { it.addressBook }
@@ -114,6 +115,7 @@ internal class CardDavReader(
             .take(10)
         val cards = ArrayList<RemoteCard>()
         val visited = HashSet<String>()
+        var changed = 0
         for (book in books) {
             if (!withinOwner(book)) continue
             val resources = propfind(book)
@@ -123,12 +125,17 @@ internal class CardDavReader(
                 if (!remote.rawPath.startsWith(book.rawPath)) continue
                 if (!remote.rawPath.endsWith(".vcf", ignoreCase = true)) continue
                 val source = remote.toASCIIString()
-                if (!visited.add(source) || source in knownSources) continue
+                if (!visited.add(source)) continue
+                if (source in knownSources) {
+                    val saved = knownSources[source]
+                    if (saved != null && resource.etag != null && saved != resource.etag) changed++
+                    continue
+                }
                 if (cards.size >= maximum) throw IOException("CardDAV-Sicherheitslimit: zu viele neue Kontakte")
-                cards.add(RemoteCard(source, request(remote, "GET", maxBytes = 256 * 1024)))
+                cards.add(RemoteCard(source, request(remote, "GET", maxBytes = 256 * 1024), resource.etag?.take(182)))
             }
         }
-        return cards
+        return Scan(cards, changed)
     }
 
     companion object {
