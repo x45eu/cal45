@@ -178,12 +178,12 @@ class MainActivity : AccountAuthenticatorActivity() {
         root.addView(text("Entwicklungsstand", 19f, light, true).apply {
             setPadding(0, dp(30), 0, dp(14))
         })
-        root.addView(text("✓  Native Android-App ohne Google Play Services\\n\\n" +
-            "✓  HTTPS-DAV-Prüfung nur mit Domainnamen\\n\\n" +
-            "✓  Lokale Token-Formatprüfung und Android-Keystore-Speicherung\\n\\n" +
-            "✓  Serverseitige App-Passwort-Prüfung über Cal45-Gateway\\n\\n" +
-            "✓  Android-Systemkonto (ohne SyncAdapter)\\n\\n" +
-            "○  Kontakte-Synchronisierung: noch offen\\n\\n" +
+        root.addView(text("✓  Native Android-App ohne Google Play Services\n\n" +
+            "✓  HTTPS-DAV-Prüfung nur mit Domainnamen\n\n" +
+            "✓  Lokale Token-Formatprüfung und Android-Keystore-Speicherung\n\n" +
+            "✓  Serverseitige App-Passwort-Prüfung über Cal45-Gateway\n\n" +
+            "✓  Android-Systemkonto (ohne SyncAdapter)\n\n" +
+            "○  Kontakte-Synchronisierung: noch offen\n\n" +
             "○  Kalender-Synchronisierung: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
             gravity = Gravity.CENTER
