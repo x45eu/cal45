@@ -1,5 +1,8 @@
 # Cal45
 
+![Cal45 logo](assets/cal45-logo.svg)
+
+
 Cal45 is a self-hosted CalDAV/CardDAV service built on [Radicale](https://radicale.org/).
 
 **Status:** v0.1 foundation. This repository currently contains a minimal DAV server, not yet a custom calendar/contact web client or public sign-up system.
