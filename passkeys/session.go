@@ -16,6 +16,7 @@ const webSessionCookie="__Host-cal45_session"
 type browserSession struct {
  username string
  csrf [32]byte
+ authenticatedAt time.Time
  expiry time.Time
 }
 
@@ -46,7 +47,7 @@ func(s *BrowserSessions)issue(username string)(token,csrf string,err error) {
   if !now.Before(item.expiry){delete(s.sessions,id)}
  }
  if len(s.sessions)>=s.maxSessions{return "","",ErrUnavailable}
- s.sessions[key]=browserSession{username:username,csrf:csrfRaw,expiry:now.Add(8*time.Hour)}
+ s.sessions[key]=browserSession{username:username,csrf:csrfRaw,authenticatedAt:now,expiry:now.Add(8*time.Hour)}
  return base64.RawURLEncoding.EncodeToString(raw),
   base64.RawURLEncoding.EncodeToString(csrfRaw[:]),nil
 }
