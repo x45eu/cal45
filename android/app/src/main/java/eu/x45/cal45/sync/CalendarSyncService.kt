@@ -14,7 +14,7 @@ import android.os.IBinder
 import android.provider.CalendarContract
 
 /**
- * Manual, remote-to-local import of standalone CalDAV CalendarContract.Events.
+ * Remote-to-local import of simple events and finite UTC/all-day series.
  * Updates only clean, fingerprint-matching imported events with strong ETags.
  * Never uploads or deletes events; legacy and locally edited entries stay untouched.
  */
@@ -69,7 +69,8 @@ internal class CalendarSyncAdapter(context: Context) :
                 val fingerprint: String?,
                 val fields: CalendarChangePolicy.Fields,
                 val dirty: Boolean,
-                val deleted: Boolean
+                val deleted: Boolean,
+                val recurring: Boolean
             )
             // Legacy imports have no ETag/snapshot and cannot be overwritten.
             val known = HashMap<String, Imported>()
@@ -79,7 +80,8 @@ internal class CalendarSyncAdapter(context: Context) :
                 CalendarContract.Events.TITLE, CalendarContract.Events.DTSTART,
                 CalendarContract.Events.DTEND, CalendarContract.Events.ALL_DAY,
                 CalendarContract.Events.DESCRIPTION, CalendarContract.Events.EVENT_LOCATION,
-                CalendarContract.Events.DIRTY, CalendarContract.Events.DELETED
+                CalendarContract.Events.DIRTY, CalendarContract.Events.DELETED,
+                CalendarContract.Events.RRULE
             )
             for (calendarId in allCalendars.values) {
                 context.contentResolver.query(
@@ -97,7 +99,8 @@ internal class CalendarSyncAdapter(context: Context) :
                                 cursor.getInt(7) == 1,
                                 cursor.getString(8) ?: "", cursor.getString(9) ?: ""
                             ),
-                            cursor.getInt(10) != 0, cursor.getInt(11) != 0
+                            cursor.getInt(10) != 0, cursor.getInt(11) != 0,
+                            !cursor.getString(12).isNullOrBlank()
                         )
                     }
                 } ?: throw IllegalStateException("Android-Termine nicht lesbar")
@@ -113,6 +116,12 @@ internal class CalendarSyncAdapter(context: Context) :
                 val event = ICalendarEvent.parse(remote.text)
                 if (event == null) { skipped++;continue }
                 val existing = known[remote.source]
+                // Recurrence changes and conversions to/from recurrence require
+                // exception-aware reconciliation. Never update them implicitly.
+                if (existing != null && (existing.recurring || event.rrule != null)) {
+                    conflicts++
+                    continue
+                }
                 if (existing != null && !CalendarChangePolicy.mayUpdate(
                         existing.etag, remote.etag, existing.fingerprint, existing.fields,
                         existing.dirty, existing.deleted
@@ -130,7 +139,15 @@ internal class CalendarSyncAdapter(context: Context) :
                     put(CalendarContract.Events.CALENDAR_ID, calendarId)
                     put(CalendarContract.Events.TITLE, event.title)
                     put(CalendarContract.Events.DTSTART, event.startMillis)
-                    put(CalendarContract.Events.DTEND, event.endMillis)
+                    if (event.rrule == null) {
+                        put(CalendarContract.Events.DTEND, event.endMillis)
+                    } else {
+                        put(CalendarContract.Events.RRULE, event.rrule)
+                        put(CalendarContract.Events.DURATION,
+                            SafeRecurrence.androidDuration(
+                                event.endMillis - event.startMillis, event.allDay
+                            ))
+                    }
                     put(CalendarContract.Events.ALL_DAY, if (event.allDay) 1 else 0)
                     put(CalendarContract.Events.EVENT_TIMEZONE, "UTC")
                     put(CalendarContract.Events.DESCRIPTION, event.description)
