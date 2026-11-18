@@ -80,4 +80,51 @@ class ConditionalDavUploadTest {
             writer.replaceExisting(source,ConditionalDavUpload.Media.VCARD,
                 "\"old\"",fingerprint,fingerprint,"BEGIN:VCARD\nFN:Ada\nEND:VCARD"))
     }
+    private fun preflightFake(
+        status: Int, tag: String?, body: String,
+        inspect: (okhttp3.Request) -> Unit = {}
+    ): OkHttpClient = OkHttpClient.Builder().addInterceptor(Interceptor { chain ->
+        inspect(chain.request())
+        Response.Builder().request(chain.request()).protocol(Protocol.HTTP_1_1)
+            .code(status).message("test")
+            .apply { if (tag != null) header("ETag", tag) }
+            .body(body.toResponseBody(null)).build()
+    }).build()
+
+    @Test fun readOnlySnapshotRequiresMatchingETagAndPreservesUnknownFields() {
+        val original = "BEGIN:VCARD\nFN:Ada\nX-PRIVATE:keep-unknown\nEND:VCARD"
+        var requests = 0
+        val writer = ConditionalDavUpload(server, "alice", credential,
+            preflightFake(200, "\"old\"", original) { request ->
+                requests++
+                assertEquals("GET", request.method)
+                assertEquals("\"old\"", request.header("If-Match"))
+            })
+        assertEquals(ConditionalDavUpload.Snapshot.Verified("\"old\"", original),
+            writer.fetchVerifiedBase(source, ConditionalDavUpload.Media.VCARD, "\"old\""))
+        assertEquals(1, requests)
+    }
+
+    @Test fun snapshotFailsClosedWhenServerChangedOrVersionMissing() {
+        val original = "BEGIN:VCARD\nFN:Ada\nEND:VCARD"
+        val changed = ConditionalDavUpload(server,"alice",credential,
+            preflightFake(412,"\"new\"",original))
+        assertEquals(ConditionalDavUpload.Snapshot.Conflict,
+            changed.fetchVerifiedBase(source,ConditionalDavUpload.Media.VCARD,"\"old\""))
+        val missing = ConditionalDavUpload(server,"alice",credential,
+            preflightFake(200,null,original))
+        assertEquals(ConditionalDavUpload.Snapshot.Unverified,
+            missing.fetchVerifiedBase(source,ConditionalDavUpload.Media.VCARD,"\"old\""))
+        val mismatched = ConditionalDavUpload(server,"alice",credential,
+            preflightFake(200,"\"new\"",original))
+        assertEquals(ConditionalDavUpload.Snapshot.Unverified,
+            mismatched.fetchVerifiedBase(source,ConditionalDavUpload.Media.VCARD,"\"old\""))
+        var requests = 0
+        val invalid = ConditionalDavUpload(server,"alice",credential,
+            preflightFake(200,"\"old\"",original) { requests++ })
+        assertEquals(ConditionalDavUpload.Snapshot.Unverified,
+            invalid.fetchVerifiedBase(source,ConditionalDavUpload.Media.VCARD,"W/\"old\""))
+        assertEquals(0, requests)
+    }
+
 }
