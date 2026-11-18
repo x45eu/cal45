@@ -5,6 +5,7 @@ import (
  "os"
  "path/filepath"
  "testing"
+ "sync"
 
  "github.com/go-webauthn/webauthn/webauthn"
 )
@@ -31,4 +32,33 @@ func TestPersistentPasskeyAccountBoundary(t *testing.T){
  if err:=os.WriteFile(auth,encoded,0600);err!=nil{t.Fatal(err)}
  if _,err:=repo.GetActive("alice");err==nil{t.Fatal("disabled account returned")}
  if err:=repo.SaveNewCredential("alice",&webauthn.Credential{ID:[]byte("key-2")});err==nil{t.Fatal("disabled account modified")}
+}
+
+func TestFirstCredentialConcurrentEnrollment(t *testing.T){
+ dir:=t.TempDir()
+ accounts:=filepath.Join(dir,"tokens.json")
+ if err:=os.WriteFile(accounts,[]byte(`{"accounts":[{"username":"alice","active":true}]}`),0600);err!=nil{t.Fatal(err)}
+ store,err:=NewJSONRepository(accounts,filepath.Join(dir,"passkeys.json"))
+ if err!=nil{t.Fatal(err)}
+ if err:=store.InitializeHandle("alice");err!=nil{t.Fatal(err)}
+ var wg sync.WaitGroup
+ successes:=make(chan bool,20)
+ for n:=0;n<20;n++{
+  wg.Add(1)
+  go func(i int){
+   defer wg.Done()
+   cred:=&webauthn.Credential{ID:[]byte{byte(i+1)}}
+   successes<-store.SaveFirstCredential("alice",cred)==nil
+  }(n)
+ }
+ wg.Wait()
+ close(successes)
+ count:=0
+ for ok:=range successes{if ok{count++}}
+ if count!=1{t.Fatalf("concurrent initial registrations succeeded %d times",count)}
+ user,err:=store.GetActive("alice")
+ if err!=nil||len(user.Credentials)!=1{t.Fatal("first registration not durable")}
+ if err:=store.SaveFirstCredential("alice",&webauthn.Credential{ID:[]byte("other")});err==nil{
+  t.Fatal("second bootstrap credential accepted")
+ }
 }
