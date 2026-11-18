@@ -2,7 +2,7 @@
 
 Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with GrapheneOS without Google Play Services.
 
-## Current development status: 0.5 prototype
+## Current development status: 0.6 prototype
 
 - Native branded setup screen.
 - Android AccountManager integration: Cal45 appears as a system account after successful HTTPS DAV authentication. The authenticator never shares DAV app passwords via Android auth tokens. Removing the account in the Cal45 UI clears both Android account and encrypted local credentials.
@@ -14,7 +14,7 @@ Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with G
 - **First CardDAV contact import:** a real Android ContactsProvider SyncAdapter now discovers CardDAV address books under the authenticated user's Radicale collection and imports **missing** vCards into an Android RawContacts account. Import is started manually from the app after granting Android READ_CONTACTS/WRITE_CONTACTS permissions. No Google Play Services required.
 - **Read-only, import-only:** Existing contacts are not modified, deleted or uploaded. Remote changes, duplicates with pre-existing personal contacts, groups, photos, advanced vCard fields and conflict handling are not synchronized yet.
 - **First CalDAV calendar import:** an Android CalendarProvider SyncAdapter now discovers calendars in the authenticated Cal45 account, imports standalone VEVENT records and creates corresponding local read-only calendars. Manual launch requires Android READ_CALENDAR and WRITE_CALENDAR permissions. No event uploads, modifications or deletions.
-- **Calendar limitations:** recurring events, exceptions, duration-only events, ambiguous floating times, multiple VEVENT files, complex/custom timezone definitions and organizer/attendee/alarm data are intentionally skipped. The parser accepts explicit UTC times, ISO offsets, valid IANA TZIDs and date-only full-day events. No automated background sync.
+- **Optional background imports:** Android's built-in periodic sync scheduler can now request import-only contacts and calendars roughly every 6 hours. Enable or disable both explicitly from Cal45 Sync, after granting Contacts and Calendar permissions. Account re-enrollment preserves the selected state. Android battery policy, sync settings and network availability determine the actual schedule; no exact execution time is guaranteed.\n- **Calendar limitations:** recurring events, exceptions, duration-only events, ambiguous floating times, multiple VEVENT files, complex/custom timezone definitions and organizer/attendee/alarm data are intentionally skipped. The parser accepts explicit UTC times, ISO offsets, valid IANA TZIDs and date-only full-day events. No automated background sync.
 - HTTP 207 from the initial credential probe does not by itself prove successful CardDAV discovery or data import.
 - The Android UI only accepts Cal45-formatted app tokens beginning with `cal45_` (at least 32 characters). This prevents accidentally entering an ordinary user password, **but does not cryptographically prove that a credential is an app password**.\n- **BLOCKER:** The Go gateway now validates separately issued Cal45 device tokens and removes untrusted identity headers. The optional Cal45 passkey auth-preview has a device-token web UI, but trusted HTTPS deployment and real device compatibility testing are pending.
 
@@ -31,7 +31,7 @@ Debug builds are testing-only. Future installable releases require a durable sig
 3. CardDAV discovery and initial vCard → Android RawContacts import (first version implemented; update/delete/conflict handling still outstanding).
 4. CalDAV discovery and basic one-time VEVENT import (implemented); recurrence, timezone exceptions and incremental changes outstanding.
 5. Android ContactsProvider and CalendarProvider import SyncAdapters (initial versions implemented).
-6. Reliable bidirectional sync, recurrence handling, advanced field mapping, permissions/security validation and signed releases.
+6. Reliable bidirectional sync, recurrence handling, advanced field mapping, permissions/security validation and signed releases. Optional Android-system periodic import exists, but is not yet a complete background synchronization solution.
 
 ## Security
 
@@ -58,3 +58,12 @@ For this first version, enter the **DAV root URL** as the server address (for ex
 4. New standalone, unambiguous events appear in a Cal45 calendar in Android. Already imported event source URLs are skipped, even if their remote contents change.
 
 This is a **test-only import**, not production calendar synchronization. It does not overwrite, delete or upload events. It explicitly skips recurring series and complex unsupported records rather than importing an incorrect single instance. Only up to ten calendar collections and 200 new ICS resources may be processed in a run; larger imports fail safely. Back up calendars before trying this with real data. Removing the Android Cal45 system account may remove associated locally imported calendar/contacts data. Server-side data are not touched by the importer.
+
+
+## Opt-in automatic import (v0.6 developer preview)
+
+After manually testing contacts and calendar imports on a **test account**, tap **„Automatischen Import aktivieren“**. Cal45 Sync checks that the Android system account still exists, the app password is stored, and both Contacts and Calendar permissions were granted. The system is then asked to run **both import-only SyncAdapters approximately every 6 hours**. This cadence is a request, not a guaranteed schedule: GrapheneOS/Android may defer sync for background restrictions, battery policy, or lack of connectivity. Android's global account sync must be on.
+
+**„Automatischen Import ausschalten“** removes both periodic schedules, switches off the per-account automatic flags and cancels any queued sync requests. **„Hintergrundimport-Status prüfen“** checks the actual Android scheduling configuration, rather than only a stored preference. Manual imports remain possible with permissions even while automatic imports are off.
+
+*Known limitations:* this only imports previously unseen server contacts and simple non-recurring calendar events. It does not remove, update or upload records. A server-side change to an already imported object is **not reflected** in Android. Avoid using real critical calendars until recurrence, incremental update/conflict handling and device testing are complete. This function uses Android's built-in sync manager, not WorkManager, AlarmManager or Google Play services.
