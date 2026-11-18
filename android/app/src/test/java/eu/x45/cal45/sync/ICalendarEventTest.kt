@@ -115,4 +115,25 @@ class ICalendarEventTest {
         ))))
     }
 
+    @Test fun rejectsInvalidFarFutureAndCanceledRecurrence() {
+        val base = "UID:test\nSUMMARY:Reminder\n" +
+            "DTSTART:20261119T130000Z\nDTEND:20261119T140000Z\n"
+        for (tail in listOf(
+            "RRULE:FREQ=DAILY;UNTIL=20261340T130000Z",
+            "RRULE:FREQ=DAILY;UNTIL=20400101T130000Z",
+            "RRULE:FREQ=DAILY;UNTIL=20261101T130000Z",
+            "RRULE:FREQ=DAILY;COUNT=5\nSTATUS:CANCELLED",
+            "RRULE:FREQ=DAILY;COUNT=5\nRDATE:20261120T130000Z",
+            "RRULE:FREQ=DAILY;COUNT=5\nRRULE:FREQ=DAILY;COUNT=6"
+        )) assertNull("unsafe recurrence: $tail", ICalendarEvent.parse(calendar(base + tail)))
+    }
+
+    @Test fun finiteUntilWithinTwoYearsIsAccepted() {
+        val event = ICalendarEvent.parse(calendar(
+            "UID:bounded\nSUMMARY:Kurztermin\nDTSTART:20261119T130000Z\n" +
+                "DTEND:20261119T140000Z\nRRULE:FREQ=WEEKLY;UNTIL=20271201T130000Z"
+        ))!!
+        assertEquals("FREQ=WEEKLY;INTERVAL=1;UNTIL=20271201T130000Z", event.rrule)
+    }
+
 }
