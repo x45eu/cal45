@@ -114,15 +114,14 @@ internal class LocalChangePreview(private val context: Context) {
             if (items.size < limit) items.add(Item("Kontakte", "Berechtigung fehlt", "GESPERRT", false))
             return
         }
-        val raw = ContactsContract.RawContacts
         val columns = arrayOf(
-            raw._ID, raw.SOURCE_ID, raw.SYNC1, raw.SYNC2,
-            raw.DIRTY, raw.DELETED
+            ContactsContract.RawContacts._ID, ContactsContract.RawContacts.SOURCE_ID, ContactsContract.RawContacts.SYNC1, ContactsContract.RawContacts.SYNC2,
+            ContactsContract.RawContacts.DIRTY, ContactsContract.RawContacts.DELETED
         )
         context.contentResolver.query(
-            raw.CONTENT_URI, columns,
-            "${raw.ACCOUNT_NAME}=? AND ${raw.ACCOUNT_TYPE}=? AND " +
-                "(${raw.DIRTY}!=0 OR ${raw.DELETED}!=0)",
+            ContactsContract.RawContacts.CONTENT_URI, columns,
+            "${ContactsContract.RawContacts.ACCOUNT_NAME}=? AND ${ContactsContract.RawContacts.ACCOUNT_TYPE}=? AND " +
+                "(${ContactsContract.RawContacts.DIRTY}!=0 OR ${ContactsContract.RawContacts.DELETED}!=0)",
             arrayOf(account.name, account.type), null
         )?.use { cursor ->
             while (cursor.moveToNext() && items.size < limit) {
