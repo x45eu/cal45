@@ -2,7 +2,7 @@
 
 Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with GrapheneOS without Google Play Services.
 
-## Current development status: 0.8 prototype
+## Current development status: 0.9 prototype
 
 - Native branded setup screen.
 - Android AccountManager integration: Cal45 appears as a system account after successful HTTPS DAV authentication. The authenticator never shares DAV app passwords via Android auth tokens. Removing the account in the Cal45 UI clears both Android account and encrypted local credentials.
@@ -16,7 +16,8 @@ Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with G
 - **First CalDAV calendar import:** an Android CalendarProvider SyncAdapter now discovers calendars in the authenticated Cal45 account, imports standalone VEVENT records and creates corresponding local read-only calendars. Manual launch requires Android READ_CALENDAR and WRITE_CALENDAR permissions. No event uploads, modifications or deletions.
 - **Optional background imports:** Android's built-in periodic sync scheduler can now request import-only contacts and calendars roughly every 6 hours. Enable or disable both explicitly from Cal45 Sync, after granting Contacts and Calendar permissions. Account re-enrollment preserves the selected state. Android battery policy, sync settings and network availability determine the actual schedule; no exact execution time is guaranteed.\n- **Guarded CalDAV updates (v0.7):** Newly imported calendar events retain a strong server ETag and a SHA-256 snapshot of their imported fields. If the ETag changes, the app conditionally downloads the new remote version, then updates only a clean, unmodified local event. Legacy events without metadata, locally edited records, changed or deleted provider entries, and unsupported recurring records are left unchanged and counted as conflicts.
 - **Guarded CardDAV updates (v0.8):** Newly imported contacts record a strong server ETag plus a SHA-256 fingerprint of imported names, phone numbers and email addresses. A later server change can update only those fields if the contact has not been locally modified or marked dirty/deleted, the fingerprint still matches, the field counts are unchanged and no unsupported local fields exist. A batch validates the old values again; conflicts are counted rather than overwritten. Older records without a fingerprint remain protected.
-- **Calendar limitations:** recurring events, exceptions, duration-only events, ambiguous floating times, multiple VEVENT files, complex/custom timezone definitions and organizer/attendee/alarm data are intentionally skipped. The parser accepts explicit UTC times, ISO offsets, valid IANA TZIDs and date-only full-day events. No automated background sync.
+- **Limited recurring calendar import (v0.9):** Finite, simple daily/weekly/monthly RFC5545 RRULEs can be imported for explicit UTC or all-day start times. Cal45 saves them with Android's required RRULE + DURATION format. Complex exceptions, RDATE/EXDATE, multiple VEVENTs, advanced BYxxx expressions, unbounded or canceled rules, and recurring IANA TZID start times are intentionally not imported. Once imported, a recurring series is **not updated or deleted** automatically; a changed series is reported as protected.
+- **Calendar limitations:** duration-only source events, ambiguous floating times, complex/custom timezone definitions and organizer/attendee/alarm data are intentionally skipped. Single-event imports accept UTC, offsets, valid IANA TZIDs and date-only full-day events. Periodic system import scheduling is optional.
 - HTTP 207 from the initial credential probe does not by itself prove successful CardDAV discovery or data import.
 - The Android UI only accepts Cal45-formatted app tokens beginning with `cal45_` (at least 32 characters). This prevents accidentally entering an ordinary user password, **but does not cryptographically prove that a credential is an app password**.\n- **BLOCKER:** The Go gateway now validates separately issued Cal45 device tokens and removes untrusted identity headers. The optional Cal45 passkey auth-preview has a device-token web UI, but trusted HTTPS deployment and real device compatibility testing are pending.
 
@@ -31,7 +32,7 @@ Debug builds are testing-only. Future installable releases require a durable sig
 1. Server-side Cal45 account and device-password management.
 2. Android AccountManager integration and safe device credentials (account scaffolding implemented; no sync adapters yet).
 3. CardDAV discovery and initial vCard → Android RawContacts import (first version implemented; update/delete/conflict handling still outstanding).
-4. CalDAV discovery and basic one-time VEVENT import (implemented); recurrence, timezone exceptions and incremental changes outstanding.
+4. CalDAV discovery, individual event imports and a limited finite UTC/all-day RRULE subset (implemented); exception-aware reconciliation and advanced recurrence are outstanding.
 5. Android ContactsProvider and CalendarProvider import SyncAdapters (initial versions implemented).
 6. Reliable bidirectional sync, recurrence handling, advanced field mapping, permissions/security validation and signed releases. Optional Android-system periodic import exists, but is not yet a complete background synchronization solution.
 
@@ -59,7 +60,7 @@ For this first version, enter the **DAV root URL** as the server address (for ex
 3. Tap **„Termine aus Cal45 importieren (nur lesend)“**, grant the Android calendar permissions, and later check **„Letzten Kalender-Import prüfen“**.
 4. New standalone, unambiguous events appear in a Cal45 calendar in Android. Already imported event source URLs with valid change metadata can be updated when the Android event has remained unchanged; older imports are not automatically overwritten.
 
-This is a **test-only import**, not production calendar synchronization. It never deletes or uploads events. Only newly imported events with a strong ETag and an unchanged local snapshot are eligible for guarded updates. It explicitly skips recurring series and complex unsupported records rather than importing an incorrect single instance. Only up to ten calendar collections and 200 new ICS resources may be processed in a run; larger imports fail safely. Back up calendars before trying this with real data. Removing the Android Cal45 system account may remove associated locally imported calendar/contacts data. Server-side data are not touched by the importer.
+This is a **test-only import**, not production calendar synchronization. It never deletes or uploads events. Only newly imported events with a strong ETag and an unchanged local snapshot are eligible for guarded updates. It imports only finite, simple UTC/all-day recurrence rules (daily, weekly or monthly) as Android recurrence masters, and skips complex unsupported rules rather than importing an incorrect single instance. Only up to ten calendar collections and 200 new ICS resources may be processed in a run; larger imports fail safely. Back up calendars before trying this with real data. Removing the Android Cal45 system account may remove associated locally imported calendar/contacts data. Server-side data are not touched by the importer.
 
 
 ## Opt-in automatic import (v0.6 developer preview)
@@ -85,3 +86,12 @@ For contacts imported with v0.8 or later, Cal45 also stores a digest of the name
 The initial CardDAV parser supports names, basic phone numbers and email addresses. For newly imported contacts, v0.8 stores the server's strong ETag and a one-way digest of exactly those normalized fields in the Android RawContacts metadata. On later runs, modified CardDAV resources are retrieved with `If-Match` and the local RawContacts and Data values are checked against the old metadata. The app only updates if the previous snapshot matches, the contact is not marked dirty/deleted and there are no local unsupported fields. Changing the number of phone numbers or email addresses is treated as a conflict to avoid incorrect field mapping. Concurrent local modifications cause an atomic provider batch to fail without applying a partial update.
 
 **There is still no upload or deletion of contacts.** This is a first-pass safe-update model, not a general-purpose field merge. Local edits, grouped contacts, labels, attachments, photos and older imported contacts may remain unchanged even when their server copy changes. Use test data and keep a backup; actual Pixel 9a/GrapheneOS provider behavior is not yet verified in hardware tests.
+
+
+## Finite recurring events (v0.9 developer preview)
+
+Cal45 can now import a conservative subset of recurring VEVENTs. Supported RRULE frequencies are `DAILY`, `WEEKLY` and `MONTHLY`, with a valid `COUNT` of 1–366 or a `UNTIL` not more than two years after the first occurrence. Intervals of 1–12, ordinary weekly `BYDAY` lists and a single monthly `BYMONTHDAY` from 1–28 are permitted. Explicit UTC `DTSTART` or date-only all-day events are accepted. CalendarProvider receives `RRULE` and `DURATION` rather than the single-event `DTEND` column.
+
+**Not supported yet:** recurrence exceptions (`RECURRENCE-ID`, `EXDATE`, `RDATE`), multiple VEVENTs in a single ICS file, timezone-local recurring start times requiring DST handling, arbitrary `BYSETPOS`/ordinal rules, indefinite repetitions, server-side updates to an already imported recurrence, and any upload/deletion. The server retains the authoritative copy. An imported recurrence remains unchanged if its server-side series changes; this is intentional until exception-safe reconciliation exists.
+
+A successful APK compile does not prove the GrapheneOS CalendarProvider renders every recurrence pattern correctly. Try small, disposable test calendars first and keep backups. The simple-event ETag update safeguards still apply to non-recurring entries.
