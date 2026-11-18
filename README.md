@@ -9,9 +9,9 @@ Cal45 is a lightweight, self-hosted CalDAV/CardDAV service with a standalone Go 
 ## Current status
 
 - Go HTML/CSS frontend: **initial design preview available** (no login, no live calendar sync).
-- DAV backend: Radicale, using htpasswd and owner-only rights.
+- DAV backend: Radicale isolated behind a Go app-password gateway, with owner-only rights.
 - Passkeys/TOTP: **planned; not implemented yet**. See [Frontend architecture and security roadmap](docs/frontend.md).
-- Both ports are bound to loopback by default; **not ready for public production use**.
+- The UI and DAV gateway bind only to loopback; the DAV engine has no host port. **Not ready for public production use**.
 
 ## Quick start (local only)
 
@@ -19,15 +19,14 @@ Cal45 is a lightweight, self-hosted CalDAV/CardDAV service with a standalone Go 
 git clone https://github.com/x45eu/cal45.git
 cd cal45
 mkdir -p data
-htpasswd -B -c config/users YOUR_USERNAME
 docker compose up -d --build
-docker compose logs -f web
+docker compose logs -f gateway web
 ```
 
 - Cal45 preview: http://127.0.0.1:8080/
-- DAV backend: http://127.0.0.1:5232/ (for compatible clients, on localhost only)
+- DAV gateway: http://127.0.0.1:8081/ (local test only; Android requires a public HTTPS DNS name)
 
-For more users: `htpasswd -B config/users ANOTHER_USERNAME` (do not use `-c` again).
+Issue a device token: `docker compose exec gateway /usr/local/bin/cal45-web token issue alice "Pixel 9a"`; see [Gateway guide](docs/dav-gateway.md).
 
 ## Project structure
 
@@ -35,7 +34,7 @@ For more users: `htpasswd -B config/users ANOTHER_USERNAME` (do not use `-c` aga
 - `cmd/cal45-web/templates/`: accessible HTML templates
 - `cmd/cal45-web/static/`: local CSS and brand assets
 - `web.Dockerfile`: lightweight multi-stage Go build
-- `config/config`: DAV engine authentication, authorization and storage
+- `config/config`: DAV engine trusted-proxy authentication, authorization and storage
 - `docs/frontend.md`: design and security architecture
 - `assets/cal45-logo.svg`: canonical Cal45 logo
 
@@ -48,7 +47,7 @@ For more users: `htpasswd -B config/users ANOTHER_USERNAME` (do not use `-c` aga
 
 ## Production security requirements
 
-**Do not deploy publicly in its current state.** There is no authenticated Cal45 web user session or account administration yet. WebAuthn/TOTP screens are informational only. Refer to [docs/frontend.md](docs/frontend.md) for concrete security acceptance criteria, including sharing identities with DAV clients.
+**Do not deploy publicly in its current state.** There is no authenticated Cal45 web user session or account administration yet. Gateway app passwords are operator-provisioned only. WebAuthn/TOTP screens are informational only. Refer to [docs/frontend.md](docs/frontend.md) for concrete security acceptance criteria, including sharing identities with DAV clients.
 
 ## Credits and licensing
 
