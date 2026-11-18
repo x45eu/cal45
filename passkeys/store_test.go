@@ -62,3 +62,24 @@ func TestFirstCredentialConcurrentEnrollment(t *testing.T){
   t.Fatal("second bootstrap credential accepted")
  }
 }
+
+func TestPasskeyCounterRollbackToZeroDenied(t *testing.T){
+ dir:=t.TempDir()
+ auth:=filepath.Join(dir,"tokens.json")
+ if err:=os.WriteFile(auth,[]byte(`{"accounts":[{"username":"alice","active":true}]}`),0600);err!=nil{t.Fatal(err)}
+ store,err:=NewJSONRepository(auth,filepath.Join(dir,"passkeys.json"))
+ if err!=nil{t.Fatal(err)}
+ if err:=store.InitializeHandle("alice");err!=nil{t.Fatal(err)}
+ initial:=&webauthn.Credential{ID:[]byte("test-credential")}
+ initial.Authenticator.SignCount=7
+ if err:=store.SaveFirstCredential("alice",initial);err!=nil{t.Fatal(err)}
+ reset:=&webauthn.Credential{ID:[]byte("test-credential")}
+ reset.Authenticator.SignCount=0
+ if err:=store.SaveVerifiedCredential("alice",reset);err==nil{t.Fatal("counter rollback to zero accepted")}
+ repeated:=&webauthn.Credential{ID:[]byte("test-credential")}
+ repeated.Authenticator.SignCount=7
+ if err:=store.SaveVerifiedCredential("alice",repeated);err==nil{t.Fatal("counter reuse accepted")}
+ valid:=&webauthn.Credential{ID:[]byte("test-credential")}
+ valid.Authenticator.SignCount=8
+ if err:=store.SaveVerifiedCredential("alice",valid);err!=nil{t.Fatal(err)}
+}
