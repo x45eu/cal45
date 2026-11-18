@@ -22,6 +22,25 @@ services:
     volumes:
       - cal45_auth:/var/lib/cal45
     networks: [dav_internal, default]
+  auth:
+    profiles: ["auth-preview"]
+    build:
+      context: .
+      dockerfile: passkeys/Dockerfile
+    restart: unless-stopped
+    # Auth service is intentionally bound only to host loopback.
+    # A trusted HTTPS proxy must route /auth/ to this service.
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      CAL45_AUTH_BIND: "0.0.0.0:8082"
+      CAL45_AUTH_ORIGIN: "${CAL45_AUTH_ORIGIN:-}"
+      CAL45_TOKEN_FILE: "/var/lib/cal45/tokens.json"
+      CAL45_PASSKEY_FILE: "/var/lib/cal45/passkeys.json"
+      CAL45_BOOTSTRAP_FILE: "/var/lib/cal45/bootstrap.json"
+    volumes:
+      - cal45_auth:/var/lib/cal45
+    depends_on: [gateway]
   web:
     build:
       context: .
