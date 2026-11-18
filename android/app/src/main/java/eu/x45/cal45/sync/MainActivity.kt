@@ -23,7 +23,7 @@ import kotlin.concurrent.thread
 /**
  * Cal45 Sync account enrollment and manual, import-only DAV SyncAdapters.
  * Requires separate Cal45 device app passwords and HTTPS DNS server URLs.
- * Initial CardDAV and CalDAV imports never upload, update or delete records.
+ * Server-to-Android guarded updates are available. Uploads and deletes remain disabled.
  */
 class MainActivity : AccountAuthenticatorActivity() {
     private val contactsPermissionRequest = 4501
@@ -337,6 +337,58 @@ class MainActivity : AccountAuthenticatorActivity() {
             }
         }
 
+        val localChangesTitle = text("Lokale Änderungen – Vorschau", 19f, light, true).apply {
+            setPadding(0, dp(24), 0, dp(8))
+        }
+        panelView.addView(localChangesTitle)
+        panelView.addView(text(
+            "Zeigt lokal bearbeitete Cal45-Kontakte und Termine. " +
+                "Es werden dabei keine Daten an den Server gesendet.",
+            13f, muted
+        ))
+        val previewButton = Button(this).apply {
+            text = "Lokale Änderungen prüfen (ohne Upload)"
+            isAllCaps = false
+            setTextColor(navy)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(accent)
+        }
+        panelView.addView(previewButton)
+        val previewResults = text("", 13f, light).apply {
+            setPadding(0, dp(10), 0, dp(14))
+        }
+        panelView.addView(previewResults)
+        previewButton.setOnClickListener {
+            val selectedAccount = Cal45BackgroundSync.account(this)
+            if (selectedAccount == null) {
+                status.text = "Zuerst ein gültiges Cal45-Systemkonto verbinden."
+                return@setOnClickListener
+            }
+            previewButton.isEnabled = false
+            previewResults.text = "Nur lokale Android-Daten werden geprüft …"
+            thread {
+                val message = try {
+                    val items = LocalChangePreview(this).inspect(selectedAccount)
+                    if (items.isEmpty()) {
+                        "Keine als geändert markierten Cal45-Einträge gefunden."
+                    } else buildString {
+                        append("Vorschau: ").append(items.size)
+                            .append(" Einträge (maximal 100).\n\n")
+                        for (item in items) {
+                            append(item.type).append(": ")
+                                .append(item.name.take(100)).append("\n")
+                                .append(item.status).append("\n\n")
+                        }
+                    }
+                } catch (_: Exception) {
+                    "Lokale Vorschau nicht verfügbar. Berechtigungen und Konto prüfen."
+                }
+                runOnUiThread {
+                    previewResults.text = message
+                    previewButton.isEnabled = true
+                }
+            }
+        }
+
         val forget = Button(this).apply {
             text = "Gespeichertes Konto entfernen"
             isAllCaps = false
@@ -364,6 +416,7 @@ class MainActivity : AccountAuthenticatorActivity() {
             "○  Abgleich geänderter/gelöschter Kontakte: noch offen\n\n" +
             "✓  CalDAV-Termine: manueller Import einfacher Einzeltermine\n\n" +
             "✓  Optionaler Hintergrundimport (systemgesteuert)\n\n" +
+            "✓  Vorschau lokal geänderter Einträge (ohne Upload)\\n\\n" +
             "○  Vollständiger bidirektionaler Abgleich: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
             gravity = Gravity.CENTER
