@@ -8,9 +8,8 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
- * Deliberately limited initial iCalendar reader. Imports only standalone,
- * non-recurring VEVENTs with explicit dates/times and end times.
- * Never silently imports one instance of a recurring series as a full series.
+ * Conservative iCalendar parser. Supports individual VEVENTs and finite,
+ * elementary UTC/all-day RRULEs. Complex exceptions fail closed.
  */
 internal object ICalendarEvent {
     data class Parsed(
@@ -20,7 +19,8 @@ internal object ICalendarEvent {
         val endMillis: Long,
         val allDay: Boolean,
         val description: String,
-        val location: String
+        val location: String,
+        val rrule: String? = null
     )
     private val date = DateTimeFormatter.BASIC_ISO_DATE
     private val local = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
@@ -83,6 +83,8 @@ internal object ICalendarEvent {
         var description = ""
         var location = ""
         var unsupported = false
+        var recurrenceRaw: String? = null
+        var startSource: String? = null
         var nested = 0
         for (line in unfolded) {
             if (line.equals("BEGIN:VEVENT", true)) {
@@ -114,9 +116,13 @@ internal object ICalendarEvent {
                 "SUMMARY" -> title = unescape(value).trim().take(256)
                 "DESCRIPTION" -> description = unescape(value).take(4096)
                 "LOCATION" -> location = unescape(value).take(256)
-                "DTSTART" -> start = timestamp(rawName, value)
+                "DTSTART" -> { start = timestamp(rawName, value); startSource = value }
                 "DTEND" -> end = timestamp(rawName, value)
-                "RRULE", "RDATE", "EXDATE", "RECURRENCE-ID", "DURATION" ->
+                "RRULE" -> {
+                    if (recurrenceRaw != null) unsupported = true
+                    recurrenceRaw = value
+                }
+                "RDATE", "EXDATE", "RECURRENCE-ID", "DURATION" ->
                     unsupported = true
             }
         }
@@ -126,6 +132,24 @@ internal object ICalendarEvent {
         if (from.allDay != to.allDay || to.millis <= from.millis) return null
         // Prevent unbounded spans and implausible calendar timestamps.
         if (to.millis - from.millis > 366L * 24 * 60 * 60 * 1000) return null
-        return Parsed(uid, title, from.millis, to.millis, from.allDay, description, location)
+        val rule = if (recurrenceRaw != null) {
+            // Import only UTC start timestamps or all-day dates. Local TZIDs
+            // require wall-time handling across DST and are not yet safe.
+            val source = startSource ?: return null
+            if (!from.allDay && !Regex("[0-9]{8}T[0-9]{6}Z").matches(source))
+                return null
+            val valid = SafeRecurrence.parse(recurrenceRaw) ?: return null
+            val until = valid.split(';').firstOrNull { it.startsWith("UNTIL=") }
+                ?.substringAfter('=')
+            if (until != null) {
+                if (from.allDay && !Regex("[0-9]{8}").matches(until)) return null
+                if (!from.allDay && !Regex("[0-9]{8}T[0-9]{6}Z").matches(until)) return null
+                if (until < source) return null
+            }
+            if (SafeRecurrence.androidDuration(to.millis - from.millis, from.allDay) == null)
+                return null
+            valid
+        } else null
+        return Parsed(uid, title, from.millis, to.millis, from.allDay, description, location, rule)
     }
 }
