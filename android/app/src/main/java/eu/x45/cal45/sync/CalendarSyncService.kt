@@ -14,14 +14,11 @@ import android.os.IBinder
 import android.provider.CalendarContract
 
 /**
- * Manual, remote-to-local import of standalone CalDAV events.
+ * Manual, remote-to-local import of standalone CalDAV CalendarContract.Events.
  * Never uploads, updates or deletes events, even when remote data changes.
  */
 internal class CalendarSyncAdapter(context: Context) :
     AbstractThreadedSyncAdapter(context, true, false) {
-
-    private val calendars = CalendarContract.Calendars
-    private val events = CalendarContract.Events
 
     private fun report(message: String) {
         context.getSharedPreferences("cal45_calendar_sync_status", Context.MODE_PRIVATE)
@@ -54,9 +51,9 @@ internal class CalendarSyncAdapter(context: Context) :
         try {
             val allCalendars = HashMap<String, Long>()
             context.contentResolver.query(
-                calendars.CONTENT_URI,
-                arrayOf(calendars._ID, calendars.CALENDAR_LOCATION),
-                "${calendars.ACCOUNT_TYPE}=? AND ${calendars.ACCOUNT_NAME}=?",
+                CalendarContract.Calendars.CONTENT_URI,
+                arrayOf(CalendarContract.Calendars._ID, CalendarContract.Calendars.CALENDAR_LOCATION),
+                "${CalendarContract.Calendars.ACCOUNT_TYPE}=? AND ${CalendarContract.Calendars.ACCOUNT_NAME}=?",
                 arrayOf(account.type, account.name), null
             )?.use { cursor ->
                 while (cursor.moveToNext()) {
@@ -70,9 +67,9 @@ internal class CalendarSyncAdapter(context: Context) :
             val known = HashSet<String>()
             for (calendarId in allCalendars.values) {
                 context.contentResolver.query(
-                    events.CONTENT_URI,
-                    arrayOf(events.SYNC_DATA1),
-                    "${events.CALENDAR_ID}=?",
+                    CalendarContract.Events.CONTENT_URI,
+                    arrayOf(CalendarContract.Events.SYNC_DATA1),
+                    "${CalendarContract.Events.CALENDAR_ID}=?",
                     arrayOf(calendarId.toString()), null
                 )?.use { cursor ->
                     while (cursor.moveToNext()) {
@@ -92,18 +89,18 @@ internal class CalendarSyncAdapter(context: Context) :
                         allCalendars[remote.calendarUrl] = it
                     }
                 val values = ContentValues().apply {
-                    put(events.CALENDAR_ID, calendarId)
-                    put(events.TITLE, event.title)
-                    put(events.DTSTART, event.startMillis)
-                    put(events.DTEND, event.endMillis)
-                    put(events.ALL_DAY, if (event.allDay) 1 else 0)
-                    put(events.EVENT_TIMEZONE, "UTC")
-                    put(events.DESCRIPTION, event.description)
-                    put(events.EVENT_LOCATION, event.location)
-                    put(events.SYNC_DATA1, remote.source)
-                    put(events.STATUS, events.STATUS_CONFIRMED)
+                    put(CalendarContract.Events.CALENDAR_ID, calendarId)
+                    put(CalendarContract.Events.TITLE, event.title)
+                    put(CalendarContract.Events.DTSTART, event.startMillis)
+                    put(CalendarContract.Events.DTEND, event.endMillis)
+                    put(CalendarContract.Events.ALL_DAY, if (event.allDay) 1 else 0)
+                    put(CalendarContract.Events.EVENT_TIMEZONE, "UTC")
+                    put(CalendarContract.Events.DESCRIPTION, event.description)
+                    put(CalendarContract.Events.EVENT_LOCATION, event.location)
+                    put(CalendarContract.Events.SYNC_DATA1, remote.source)
+                    put(CalendarContract.Events.STATUS, CalendarContract.Events.STATUS_CONFIRMED)
                 }
-                val result = context.contentResolver.insert(syncUri(events.CONTENT_URI, account), values)
+                val result = context.contentResolver.insert(syncUri(CalendarContract.Events.CONTENT_URI, account), values)
                 if (result == null) throw IllegalStateException("Termin konnte nicht gespeichert werden")
                 imported++
                 syncResult.stats.numInserts++
@@ -124,26 +121,26 @@ internal class CalendarSyncAdapter(context: Context) :
     private fun syncUri(base: android.net.Uri, account: Account): android.net.Uri =
         base.buildUpon()
             .appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
-            .appendQueryParameter(calendars.ACCOUNT_NAME, account.name)
-            .appendQueryParameter(calendars.ACCOUNT_TYPE, account.type)
+            .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_NAME, account.name)
+            .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_TYPE, account.type)
             .build()
 
     private fun createCalendar(account: Account, location: String): Long {
         val title = location.trimEnd('/').substringAfterLast('/').take(80).ifEmpty { "Cal45" }
         val values = ContentValues().apply {
-            put(calendars.ACCOUNT_NAME, account.name)
-            put(calendars.ACCOUNT_TYPE, account.type)
-            put(calendars.NAME, "Cal45: $title")
-            put(calendars.CALENDAR_DISPLAY_NAME, "Cal45 · $title")
-            put(calendars.CALENDAR_LOCATION, location)
-            put(calendars.CALENDAR_COLOR, android.graphics.Color.rgb(96, 165, 250))
-            put(calendars.CALENDAR_ACCESS_LEVEL, calendars.CAL_ACCESS_READ)
-            put(calendars.OWNER_ACCOUNT, account.name)
-            put(calendars.VISIBLE, 1)
-            put(calendars.SYNC_EVENTS, 1)
-            put(calendars.CALENDAR_TIME_ZONE, "UTC")
+            put(CalendarContract.Calendars.ACCOUNT_NAME, account.name)
+            put(CalendarContract.Calendars.ACCOUNT_TYPE, account.type)
+            put(CalendarContract.Calendars.NAME, "Cal45: $title")
+            put(CalendarContract.Calendars.CALENDAR_DISPLAY_NAME, "Cal45 · $title")
+            put(CalendarContract.Calendars.CALENDAR_LOCATION, location)
+            put(CalendarContract.Calendars.CALENDAR_COLOR, android.graphics.Color.rgb(96, 165, 250))
+            put(CalendarContract.Calendars.CALENDAR_ACCESS_LEVEL, CalendarContract.Calendars.CAL_ACCESS_READ)
+            put(CalendarContract.Calendars.OWNER_ACCOUNT, account.name)
+            put(CalendarContract.Calendars.VISIBLE, 1)
+            put(CalendarContract.Calendars.SYNC_EVENTS, 1)
+            put(CalendarContract.Calendars.CALENDAR_TIME_ZONE, "UTC")
         }
-        val inserted = context.contentResolver.insert(syncUri(calendars.CONTENT_URI, account), values)
+        val inserted = context.contentResolver.insert(syncUri(CalendarContract.Calendars.CONTENT_URI, account), values)
             ?: throw IllegalStateException("Cal45-Kalender konnte nicht erstellt werden")
         return inserted.lastPathSegment?.toLongOrNull()
             ?: throw IllegalStateException("Neue Kalender-ID fehlt")
