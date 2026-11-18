@@ -412,11 +412,11 @@ class MainActivity : AccountAuthenticatorActivity() {
             "✓  Lokale Token-Formatprüfung und Android-Keystore-Speicherung\n\n" +
             "✓  Serverseitige App-Passwort-Prüfung über Cal45-Gateway\n\n" +
             "✓  Android-Systemkonto und Kontakte-SyncAdapter\n\n" +
-            "✓  CardDAV-Kontakte: manueller, nur lesender Erstimport\n\n" +
-            "○  Abgleich geänderter/gelöschter Kontakte: noch offen\n\n" +
-            "✓  CalDAV-Termine: manueller Import einfacher Einzeltermine\n\n" +
+            "✓  CardDAV-Kontakte: Import und geschützte Updates\n\n" +
+            "○  Kontaktlöschungen und Uploads: noch offen\n\n" +
+            "✓  CalDAV-Termine: Import, Updates und begrenzte Serien\n\n" +
             "✓  Optionaler Hintergrundimport (systemgesteuert)\n\n" +
-            "✓  Vorschau lokal geänderter Einträge (ohne Upload)\\n\\n" +
+            "✓  Vorschau lokal geänderter Einträge (ohne Upload)\n\n" +
             "○  Vollständiger bidirektionaler Abgleich: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
             gravity = Gravity.CENTER
