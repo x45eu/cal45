@@ -19,6 +19,11 @@ type Page struct {
  Description string
 }
 func main() {
+ if len(os.Args)>1 {
+  if os.Args[1]=="dav-gateway" {log.Fatal(startDAV());return}
+  if os.Args[1]=="token" {if err:=tokenCLI(os.Args[2:]);err!=nil{log.Fatal(err)};return}
+  log.Fatal("unknown command")
+ }
  tmpl := template.Must(template.ParseFS(content, "templates/*.html"))
  mux := http.NewServeMux()
  mux.Handle("GET /static/", http.FileServer(http.FS(content)))

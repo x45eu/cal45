@@ -1,15 +1,9 @@
-# Cal45 v0.1 – CalDAV / CardDAV engine.
-# Expose externally only behind a correctly configured HTTPS reverse proxy.
+# Cal45 backend: X-Remote-User is trusted ONLY from the isolated gateway.
 [server]
 hosts = 0.0.0.0:5232
-
 [auth]
-type = htpasswd
-htpasswd_filename = /etc/radicale/users
-htpasswd_encryption = bcrypt
-
+type = http_x_remote_user
 [rights]
 type = owner_only
-
 [storage]
 filesystem_folder = /var/lib/radicale/collections

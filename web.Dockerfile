@@ -6,8 +6,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /cal45-web ./cmd/cal45-
 
 FROM alpine:3.22
 RUN addgroup -S cal45 && adduser -S -G cal45 cal45
+RUN mkdir -p /var/lib/cal45 && chown cal45:cal45 /var/lib/cal45
 COPY --from=builder /cal45-web /usr/local/bin/cal45-web
 USER cal45
-EXPOSE 8080
+EXPOSE 8080 8081
 ENV CAL45_WEB_BIND=0.0.0.0:8080
 ENTRYPOINT ["/usr/local/bin/cal45-web"]

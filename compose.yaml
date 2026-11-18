@@ -1,16 +1,27 @@
 name: cal45
-
 services:
   cal45:
-    # DAV backend is reachable only from the host on loopback.
     image: ghcr.io/kozea/radicale:stable
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:5232:5232"
+    networks: [dav_internal]
     volumes:
       - ./config:/etc/radicale:ro
       - ./data:/var/lib/radicale
-
+  gateway:
+    build:
+      context: .
+      dockerfile: web.Dockerfile
+    command: ["dav-gateway"]
+    restart: unless-stopped
+    depends_on: [cal45]
+    ports:
+      - "127.0.0.1:8081:8081"
+    environment:
+      CAL45_GATEWAY_BIND: "0.0.0.0:8081"
+      CAL45_DAV_UPSTREAM: "http://cal45:5232"
+    volumes:
+      - cal45_auth:/var/lib/cal45
+    networks: [dav_internal, default]
   web:
     build:
       context: .
@@ -18,3 +29,8 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:8080:8080"
+networks:
+  dav_internal:
+    internal: true
+volumes:
+  cal45_auth:
