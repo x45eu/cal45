@@ -85,4 +85,32 @@ class DavFieldPatchTest {
             "BEGIN:VEVENT\nSUMMARY:Second\nEND:VEVENT\nEND:VCALENDAR"),
             DavFieldPatch.Target.EVENT_TITLE,"Meeting","Updated"))
     }
+    @Test fun refusesMismatchedNestedComponentsAndHiddenExtraRoots() {
+        val base = "BEGIN:VCALENDAR\nBEGIN:VTIMEZONE\nTZID:Europe/Berlin\n" +
+            "END:VTIMEZONE\nBEGIN:VEVENT\nUID:event\nSUMMARY:Meeting\n" +
+            "END:VEVENT\nEND:VCALENDAR\n"
+        val malformed = listOf(
+            base.replace("END:VTIMEZONE", "END:VEVENT"),
+            base.replace("END:VEVENT", "END:VTIMEZONE"),
+            base.replace("END:VCALENDAR", "END:VEVENT"),
+            base + base,
+            base.replace("SUMMARY:Meeting", "SUMMARY:Meeting\nSUMMARY:Second"),
+            base.replace("SUMMARY:Meeting", "SUMMARY;LANGUAGE=de:Meeting")
+        )
+        for (input in malformed) rejected(DavFieldPatch.prepare(
+            input, DavFieldPatch.Target.EVENT_TITLE, "Meeting", "New title"
+        ))
+    }
+
+    @Test fun outputChangesExactlyOneLineOfOriginal() {
+        val input = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\n" +
+            "BEGIN:VEVENT\r\nUID:immutable\r\nSUMMARY:First\r\n" +
+            "X-UNKNOWN:Retain \\; and \\, unchanged\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+        val result = prepared(DavFieldPatch.prepare(
+            input, DavFieldPatch.Target.EVENT_TITLE, "First", "Second"
+        ))
+        assertEquals(input.replace("SUMMARY:First", "SUMMARY:Second"), result.patchedText)
+        assertEquals(1, result.changedLines)
+    }
+
 }
