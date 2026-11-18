@@ -2,6 +2,12 @@ package eu.x45.cal45.sync
 
 import android.accounts.AccountAuthenticatorActivity
 import android.accounts.AccountManager
+import android.accounts.Account
+import android.Manifest
+import android.content.ContentResolver
+import android.content.pm.PackageManager
+import android.provider.ContactsContract
+import android.os.Build
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -21,6 +27,34 @@ import kotlin.concurrent.thread
  * Registers an Android system account but does not sync contacts/calendars yet.
  */
 class MainActivity : AccountAuthenticatorActivity() {
+    private val contactsPermissionRequest = 4501
+
+    private fun importContactsNow() {
+        val vault = CredentialVault(this)
+        val server = vault.server()
+        val user = vault.username()
+        if (!vault.configured() || DavProbe.normalizedUrl(server) == null ||
+            vault.readAppPassword() == null) return
+        val name = Cal45SystemAccount.accountName(server, user)
+        val matches = AccountManager.get(this).getAccountsByType(Cal45SystemAccount.TYPE)
+            .firstOrNull { it.name == name } ?: return
+        ContentResolver.setIsSyncable(matches, ContactsContract.AUTHORITY, 1)
+        ContentResolver.requestSync(matches, ContactsContract.AUTHORITY, Bundle().apply {
+            putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true)
+            putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true)
+        })
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<out String>, grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == contactsPermissionRequest &&
+            grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+            importContactsNow()
+        }
+    }
+
     private val navy = Color.rgb(25, 34, 44)
     private val panel = Color.rgb(34, 48, 63)
     private val light = Color.rgb(212, 219, 229)
@@ -155,6 +189,29 @@ class MainActivity : AccountAuthenticatorActivity() {
             }
         }
 
+        val contactsImport = Button(this).apply {
+            text = "Kontakte aus Cal45 importieren (nur lesend)"
+            isAllCaps = false
+            setTextColor(navy)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(accent)
+        }
+        panelView.addView(contactsImport)
+        contactsImport.setOnClickListener {
+            val stored = CredentialVault(this)
+            if (!stored.configured()) {
+                status.text = "Zuerst den Cal45-DAV-Zugang prüfen und speichern."
+                return@setOnClickListener
+            }
+            val required = arrayOf(Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS)
+            if (required.any { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }) {
+                status.text = "Android benötigt die Kontakte-Berechtigung für den Import."
+                requestPermissions(required, contactsPermissionRequest)
+            } else {
+                importContactsNow()
+                status.text = "Kontakte-Import angefordert. Neue Kontakte erscheinen nach dem Abgleich in Android."
+            }
+        }
+
         val forget = Button(this).apply {
             text = "Gespeichertes Konto entfernen"
             isAllCaps = false
@@ -178,7 +235,8 @@ class MainActivity : AccountAuthenticatorActivity() {
             "✓  Lokale Token-Formatprüfung und Android-Keystore-Speicherung\n\n" +
             "✓  Serverseitige App-Passwort-Prüfung über Cal45-Gateway\n\n" +
             "✓  Android-Systemkonto (ohne SyncAdapter)\n\n" +
-            "○  Kontakte-Synchronisierung: noch offen\n\n" +
+            "✓  CardDAV-Kontakte: manueller, nur lesender Erstimport\\n\\n" +
+            "○  Abgleich geänderter/gelöschter Kontakte: noch offen\n\n" +
             "○  Kalender-Synchronisierung: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
             gravity = Gravity.CENTER
