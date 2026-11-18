@@ -1,5 +1,5 @@
-# Cal45 v0.1 – Radicale DAV core.
-# Expose externally only behind a correctly configured HTTPS reverse proxy.
+# Cal45 v0.1 - Radicale DAV core.
+# Nur ueber NetBird-Reverse-Proxy erreichbar (OPNsense Routing-Peer).
 [server]
 hosts = 0.0.0.0:5232
 
@@ -7,9 +7,13 @@ hosts = 0.0.0.0:5232
 type = htpasswd
 htpasswd_filename = /etc/radicale/users
 htpasswd_encryption = bcrypt
+delay = 1
 
 [rights]
 type = owner_only
 
 [storage]
 filesystem_folder = /var/lib/radicale/collections
+
+[logging]
+level = info
