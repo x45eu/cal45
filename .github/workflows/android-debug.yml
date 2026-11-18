@@ -32,10 +32,10 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.11.1"
-      - name: Install Android SDK
-        run: |
-          sdkmanager --licenses < /dev/null || true
-          sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Configure Android SDK and command-line tools
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK platform
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload APK
