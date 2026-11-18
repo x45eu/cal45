@@ -126,12 +126,11 @@ func(r *JSONRepository)SaveVerifiedCredential(username string,credential *webaut
   found:=false
   for i:=range u.Credentials{
    if bytes.Equal(u.Credentials[i].ID,credential.ID){
-    // Reject counter rollback; zero is allowed for authenticators without
-    // monotonic counters, consistent with WebAuthn.
-    if credential.Authenticator.SignCount!=0&&
-      u.Credentials[i].Authenticator.SignCount>=credential.Authenticator.SignCount{
-     return ErrUnavailable
-    }
+    // Never allow a previously advancing signature counter to reset to
+    // zero or repeat. Passkeys with no counter (0 -> 0) remain supported.
+    previous:=u.Credentials[i].Authenticator.SignCount
+    incoming:=credential.Authenticator.SignCount
+    if previous>0&&incoming<=previous {return ErrUnavailable}
     u.Credentials[i]=*credential
     found=true
     break
