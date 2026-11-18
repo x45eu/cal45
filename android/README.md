@@ -9,7 +9,7 @@ Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with G
 - Authentication failures are reported without leaking the password.
 - Credentials are saved **only after a successful test**; passwords encrypted via Android Keystore AES-GCM, with ciphertext and nonce in private app preferences and Android backups disabled.
 - An explicit button deletes stored local credentials.
-- No redirect following, no custom trust-all TLS handling, no external JavaScript, analytics, or SDK dependencies.
+- No redirect following, no custom trust-all TLS handling, no external JavaScript or analytics. OkHttp is the one HTTP dependency needed for WebDAV's PROPFIND method.
 - **No synchronization yet**. An HTTP 207 check alone does not prove complete CalDAV/CardDAV interoperability.
 - Until Cal45 creates per-device passwords, the test can technically use the current DAV username/password. For real deployment prefer separate revocable app passwords from the planned account service.
 

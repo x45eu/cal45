@@ -1,16 +1,26 @@
 package eu.x45.cal45.sync
 
 import android.util.Base64
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import java.net.URI
-import java.net.URL
-import javax.net.ssl.HttpsURLConnection
+import java.util.concurrent.TimeUnit
 
 /**
- * Minimal DAV authentication probe; no changes to remote collections.
- * Strict TLS validation is delegated to the Android platform trust store.
+ * Read-only DAV authentication probe.
+ * Uses platform TLS validation, rejects redirects, and never changes remote data.
  */
 object DavProbe {
     data class Result(val successful: Boolean, val message: String)
+
+    private val client = OkHttpClient.Builder()
+        .followRedirects(false)
+        .followSslRedirects(false)
+        .connectTimeout(7, TimeUnit.SECONDS)
+        .readTimeout(7, TimeUnit.SECONDS)
+        .callTimeout(12, TimeUnit.SECONDS)
+        .build()
 
     fun normalizedUrl(input: String): String? {
         val uri = try { URI(input.trim()) } catch (_: Exception) { return null }
@@ -31,29 +41,27 @@ object DavProbe {
             return Result(false, "Benutzername oder App-Passwort ungültig.")
         }
         val url = normalizedUrl(serverUrl) ?: return Result(false, "Nur gültige HTTPS-Adressen sind erlaubt.")
-        var connection: HttpsURLConnection? = null
         return try {
-            connection = URL(url).openConnection() as HttpsURLConnection
-            connection.instanceFollowRedirects = false
-            connection.connectTimeout = 7000
-            connection.readTimeout = 7000
-            connection.requestMethod = "PROPFIND"
-            connection.setRequestProperty("Depth", "0")
-            connection.setRequestProperty("Accept", "application/xml")
             val token = Base64.encodeToString(
                 "$username:$appPassword".toByteArray(Charsets.UTF_8), Base64.NO_WRAP
             )
-            connection.setRequestProperty("Authorization", "Basic $token")
-            when (connection.responseCode) {
-                207 -> Result(true, "DAV-Verbindung und Zugangsdaten erfolgreich geprüft.")
-                401, 403 -> Result(false, "Zugang abgelehnt. Benutzername oder App-Passwort prüfen.")
-                301, 302, 303, 307, 308 -> Result(false, "Server leitet um. Bitte die endgültige HTTPS-DAV-Adresse verwenden.")
-                else -> Result(false, "Keine DAV-Bestätigung (HTTP ${connection.responseCode}).")
+            val request = Request.Builder()
+                .url(url)
+                .method("PROPFIND", byteArrayOf().toRequestBody(null))
+                .header("Depth", "0")
+                .header("Accept", "application/xml")
+                .header("Authorization", "Basic $token")
+                .build()
+            client.newCall(request).execute().use { response ->
+                when (response.code) {
+                    207 -> Result(true, "DAV-Verbindung und Zugangsdaten erfolgreich geprüft.")
+                    401, 403 -> Result(false, "Zugang abgelehnt. Benutzername oder App-Passwort prüfen.")
+                    301, 302, 303, 307, 308 -> Result(false, "Server leitet um. Bitte die endgültige HTTPS-DAV-Adresse verwenden.")
+                    else -> Result(false, "Keine DAV-Bestätigung (HTTP ${response.code}).")
+                }
             }
         } catch (_: Exception) {
             Result(false, "DAV-Verbindung fehlgeschlagen. HTTPS, Zertifikat und Serveradresse prüfen.")
-        } finally {
-            connection?.disconnect()
         }
     }
 }

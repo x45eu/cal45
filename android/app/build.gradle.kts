@@ -2,6 +2,11 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
 }
+
+dependencies {
+    // HTTP client supports WebDAV extensions such as PROPFIND.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+}
 android {
     namespace = "eu.x45.cal45.sync"
     compileSdk = 35
