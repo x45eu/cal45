@@ -1,7 +1,8 @@
 name: cal45
 
 services:
-  radicale:
+  cal45:
+    # Upstream DAV engine (internal implementation detail).
     image: ghcr.io/kozea/radicale:stable
     restart: unless-stopped
     ports:
