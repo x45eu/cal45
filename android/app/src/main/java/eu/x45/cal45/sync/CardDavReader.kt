@@ -54,6 +54,9 @@ internal class CardDavReader(
             url.port == ownerHome.port &&
             url.rawUserInfo == null && url.rawQuery == null && url.rawFragment == null &&
             url.normalize() == url &&
+            !Regex("(?i)%(?:2e|2f|5c|00)").containsMatchIn(url.rawPath) &&
+            !url.path.contains('\\') &&
+            url.rawPath.length <= 1024 &&
             url.rawPath.startsWith(ownerHome.rawPath) &&
             DavProbe.normalizedUrl(url.toASCIIString()) != null
 
