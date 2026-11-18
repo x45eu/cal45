@@ -19,7 +19,7 @@ func ValidOrigin(origin string)(string,error){
  return u.Hostname(),nil
 }
 func validDNS(host string)bool{
- if len(host)>253||!strings.Contains(host,".")||strings.ContainsAny(host,":[]")||strings.HasSuffix(host,".") {return false}
+ if len(host)>253||!strings.Contains(host,".")||strings.ContainsAny(host,":[]" )||strings.HasSuffix(host,".") {return false}
  labels:=strings.Split(host,".")
  for _,l:=range labels{
   if len(l)<1||len(l)>63||l[0]=='-'||l[len(l)-1]=='-' {return false}
