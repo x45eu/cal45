@@ -56,7 +56,7 @@ class Cal45Authenticator(private val context: Context) : AbstractAccountAuthenti
         account: Account?,
         authTokenType: String?,
         options: Bundle?
-    ): Bundle = addAccount(response, TYPE, authTokenType, null, options)
+    ): Bundle = addAccount(response, Cal45SystemAccount.TYPE, authTokenType, null, options)
 
     override fun hasFeatures(
         response: AccountAuthenticatorResponse?,
