@@ -51,6 +51,7 @@ object Cal45SystemAccount {
     }
 
     fun remove(context: Context) {
+        Cal45BackgroundSync.disable(context)
         val manager = AccountManager.get(context)
         for (account in manager.getAccountsByType(TYPE)) {
             manager.removeAccountExplicitly(account)
