@@ -2,7 +2,7 @@
 
 Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with GrapheneOS without Google Play Services.
 
-## Current development status: 0.4 prototype
+## Current development status: 0.5 prototype
 
 - Native branded setup screen.
 - Android AccountManager integration: Cal45 appears as a system account after successful HTTPS DAV authentication. The authenticator never shares DAV app passwords via Android auth tokens. Removing the account in the Cal45 UI clears both Android account and encrypted local credentials.
@@ -12,7 +12,9 @@ Cal45 Sync is a native Kotlin Android project for Cal45, intended to work with G
 - An explicit button deletes stored local credentials.
 - No redirect following, no custom trust-all TLS handling, no external JavaScript or analytics. OkHttp is the one HTTP dependency needed for WebDAV's PROPFIND method.
 - **First CardDAV contact import:** a real Android ContactsProvider SyncAdapter now discovers CardDAV address books under the authenticated user's Radicale collection and imports **missing** vCards into an Android RawContacts account. Import is started manually from the app after granting Android READ_CONTACTS/WRITE_CONTACTS permissions. No Google Play Services required.
-- **Read-only, import-only:** Existing contacts are not modified, deleted or uploaded. Remote changes, duplicates with pre-existing personal contacts, groups, photos, advanced vCard fields and conflict handling are not synchronized yet. CalendarProvider/CalDAV remains unimplemented.
+- **Read-only, import-only:** Existing contacts are not modified, deleted or uploaded. Remote changes, duplicates with pre-existing personal contacts, groups, photos, advanced vCard fields and conflict handling are not synchronized yet.
+- **First CalDAV calendar import:** an Android CalendarProvider SyncAdapter now discovers calendars in the authenticated Cal45 account, imports standalone VEVENT records and creates corresponding local read-only calendars. Manual launch requires Android READ_CALENDAR and WRITE_CALENDAR permissions. No event uploads, modifications or deletions.
+- **Calendar limitations:** recurring events, exceptions, duration-only events, ambiguous floating times, multiple VEVENT files, complex/custom timezone definitions and organizer/attendee/alarm data are intentionally skipped. The parser accepts explicit UTC times, ISO offsets, valid IANA TZIDs and date-only full-day events. No automated background sync.
 - HTTP 207 from the initial credential probe does not by itself prove successful CardDAV discovery or data import.
 - The Android UI only accepts Cal45-formatted app tokens beginning with `cal45_` (at least 32 characters). This prevents accidentally entering an ordinary user password, **but does not cryptographically prove that a credential is an app password**.\n- **BLOCKER:** The Go gateway now validates separately issued Cal45 device tokens and removes untrusted identity headers. The optional Cal45 passkey auth-preview has a device-token web UI, but trusted HTTPS deployment and real device compatibility testing are pending.
 
@@ -27,9 +29,9 @@ Debug builds are testing-only. Future installable releases require a durable sig
 1. Server-side Cal45 account and device-password management.
 2. Android AccountManager integration and safe device credentials (account scaffolding implemented; no sync adapters yet).
 3. CardDAV discovery and initial vCard → Android RawContacts import (first version implemented; update/delete/conflict handling still outstanding).
-4. CalDAV discovery, iCalendar recurrence/timezone processing, incremental sync.
-5. Android ContactsProvider SyncAdapter (initial import implemented), CalendarProvider still outstanding.
-6. Reliable automatic background sync, advanced contact mapping, permissions/security validation and signed releases.
+4. CalDAV discovery and basic one-time VEVENT import (implemented); recurrence, timezone exceptions and incremental changes outstanding.
+5. Android ContactsProvider and CalendarProvider import SyncAdapters (initial versions implemented).
+6. Reliable bidirectional sync, recurrence handling, advanced field mapping, permissions/security validation and signed releases.
 
 ## Security
 
@@ -46,3 +48,13 @@ The Android Keystore key is local to the installation. Deleting app data or rein
 For this first version, enter the **DAV root URL** as the server address (for example, `https://dav.example.org/`), not an individual address book. The discovery looks for CardDAV address books under `/USERNAME/`. Requests have strict size/item limits; larger collections may be rejected until incremental paging is implemented. If a collection has more than 200 **new** contact records, the importer fails rather than silently truncating. Existing Cal45-owned raw contacts are skipped on subsequent imports to avoid replacing local edits.
 
 **Back up your contacts before testing.** This is a preliminary parser supporting names, phone numbers and email addresses. It does not download pictures, categories, birthdays, extended address fields or handle remote updates/deletions. System-contact deletion caused by removing the entire Android account is also possible, so use a test address book first. The APK must still pass CI and be tested on GrapheneOS hardware.
+
+
+## Manually import a calendar (development build)
+
+1. Set up a CalDAV calendar in the existing Radicale account and use the same HTTPS DAV root URL as for contacts.
+2. Verify and save the Cal45 device app password in the Android app; this creates the Cal45 Android system account.
+3. Tap **„Termine aus Cal45 importieren (nur lesend)“**, grant the Android calendar permissions, and later check **„Letzten Kalender-Import prüfen“**.
+4. New standalone, unambiguous events appear in a Cal45 calendar in Android. Already imported event source URLs are skipped, even if their remote contents change.
+
+This is a **test-only import**, not production calendar synchronization. It does not overwrite, delete or upload events. It explicitly skips recurring series and complex unsupported records rather than importing an incorrect single instance. Only up to ten calendar collections and 200 new ICS resources may be processed in a run; larger imports fail safely. Back up calendars before trying this with real data. Removing the Android Cal45 system account may remove associated locally imported calendar/contacts data. Server-side data are not touched by the importer.
