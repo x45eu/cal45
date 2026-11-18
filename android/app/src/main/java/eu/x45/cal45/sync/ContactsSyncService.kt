@@ -21,6 +21,12 @@ import android.provider.ContactsContract
 internal class ContactsSyncAdapter(context: Context) :
     AbstractThreadedSyncAdapter(context, true, false) {
 
+    private fun report(message: String) {
+        context.getSharedPreferences("cal45_contact_sync_status", Context.MODE_PRIVATE)
+            .edit().putString("message", message)
+            .putLong("timestamp", System.currentTimeMillis()).apply()
+    }
+
     override fun onPerformSync(
         account: Account, extras: Bundle, authority: String,
         provider: ContentProviderClient, syncResult: SyncResult
@@ -29,6 +35,7 @@ internal class ContactsSyncAdapter(context: Context) :
         if (context.checkSelfPermission(Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED ||
             context.checkSelfPermission(Manifest.permission.WRITE_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
             syncResult.stats.numAuthExceptions++
+            report("Kontakte-Berechtigung fehlt oder wurde entzogen.")
             return
         }
         val vault = CredentialVault(context)
@@ -39,6 +46,7 @@ internal class ContactsSyncAdapter(context: Context) :
             DavProbe.normalizedUrl(server) == null ||
             Cal45SystemAccount.accountName(server, user) != account.name) {
             syncResult.stats.numAuthExceptions++
+            report("Cal45-Systemkonto oder gespeichertes App-Passwort ungültig.")
             return
         }
         try {
@@ -53,18 +61,26 @@ internal class ContactsSyncAdapter(context: Context) :
             } ?: throw IllegalStateException("Kontakteanbieter nicht verfügbar")
             val reader = CardDavReader(server, user, password)
             val cards = reader.fetchNewCards(existing)
+            var imported = 0
+            var skipped = 0
             for (card in cards) {
                 if (Thread.currentThread().isInterrupted) break
-                val parsed = VCardContact.parse(card.text) ?: continue
+                val parsed = VCardContact.parse(card.text)
+                if (parsed == null) { skipped++; continue }
                 addContact(account, card.source, parsed)
+                imported++
                 syncResult.stats.numInserts++
             }
+            report("Import beendet: $imported neue Kontakte, $skipped nicht unterstützte Karten übersprungen.")
         } catch (_: java.io.IOException) {
             syncResult.stats.numIoExceptions++
+            report("DAV-Verbindung oder Adressbuchabruf fehlgeschlagen.")
         } catch (_: android.os.RemoteException) {
             syncResult.stats.numIoExceptions++
+            report("Android-Kontakteanbieter konnte nicht aktualisiert werden.")
         } catch (_: Exception) {
             syncResult.stats.numParseExceptions++
+            report("Kontakteimport fehlgeschlagen: Datenformat oder lokale Verarbeitung.")
         }
     }
 
