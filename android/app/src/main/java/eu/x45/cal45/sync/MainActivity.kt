@@ -40,6 +40,10 @@ class MainActivity : Activity() {
         window.navigationBarColor = navy
 
         val vault = CredentialVault(this)
+        // Discard credentials saved by older builds that accepted account passwords.
+        if (vault.configured() && !DavProbe.looksLikeAppPassword(vault.readAppPassword() ?: "")) {
+            vault.remove()
+        }
         val scroll = ScrollView(this).apply { setBackgroundColor(navy) }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
