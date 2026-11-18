@@ -34,6 +34,13 @@ func NewAuthHandler(origin string,repository *JSONRepository,grants BootstrapSto
   Service:service,Repository:repository,Grants:grants,Origin:origin,
  }
  if err:=enroll.Register(mux);err!=nil{return nil,err}
+ devices:=&DevicePasswords{
+  TokenFile:repository.accounts,
+  Sessions:sessions.Store,
+  Origin:origin,
+  Active:repository.accountActive,
+ }
+ if err:=devices.Register(mux);err!=nil{return nil,err}
  routes:=map[string]string{
   "/auth/login":"web/login.html",
   "/auth/login.css":"web/login.css",
