@@ -14,3 +14,8 @@ This handler is not auto-registered; an embedding server must explicitly instant
 Additional passkeys on an existing account must use the separate step-up-protected registration flow, **not** another setup grant. A failed or interrupted ceremony consumes the setup grant and requires the operator to issue a new one.
 
 This flow is an integration component, not a deployed public user-facing service.
+
+
+## Static browser screen
+
+`web/enroll.html` and `web/enroll.js` provide the Cal45-branded browser ceremony, with native `navigator.credentials.create` and no third-party JavaScript. The setup token is entered into a password field and posted in the HTTPS request body, **never placed in a link**. The token is cleared from the form after the first request. These static assets are not yet included in the running Go frontend and cannot be used until an explicitly approved enrollment deployment exists.

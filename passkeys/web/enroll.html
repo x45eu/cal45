@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Cal45 – Ersten Passkey einrichten</title>
+<link rel="stylesheet" href="./login.css">
+<script src="./enroll.js" defer></script>
+</head>
+<body>
+<main class="panel">
+  <header><div class="mark" aria-hidden="true">▦</div><h1>Cal45</h1><p class="sub">Dein Kalender. Deine Kontakte. Deine Cloud.</p></header>
+  <form id="enroll-form" autocomplete="off">
+    <h2>Ersten Passkey einrichten</h2>
+    <p>Dein Serveradministrator gibt dir einen einmaligen Einrichtungsschlüssel. Er ist zehn Minuten gültig.</p>
+    <label for="username">Cal45-Benutzername</label>
+    <input id="username" name="username" maxlength="128" autocomplete="username" spellcheck="false" required>
+    <label for="setup-token">Einrichtungsschlüssel</label>
+    <input id="setup-token" name="setup-token" type="password" maxlength="64" autocomplete="off" spellcheck="false" required>
+    <button id="enroll" type="submit">Passkey auf diesem Gerät einrichten</button>
+    <p id="status" aria-live="polite" role="status">Die Einrichtung ist noch nicht im Cal45-Webserver aktiviert.</p>
+  </form>
+  <footer>Bereitgestellt von Cal45</footer>
+</main>
+</body>
+</html>
