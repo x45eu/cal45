@@ -1,4 +1,4 @@
-# Cal45 v0.1 – Radicale DAV core.
+# Cal45 v0.1 – CalDAV / CardDAV engine.
 # Expose externally only behind a correctly configured HTTPS reverse proxy.
 [server]
 hosts = 0.0.0.0:5232
