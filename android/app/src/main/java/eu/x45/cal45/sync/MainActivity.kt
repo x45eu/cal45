@@ -46,13 +46,8 @@ class MainActivity : AccountAuthenticatorActivity() {
             vault.remove()
             Cal45SystemAccount.remove(this)
         }
-        if (vault.configured()) {
-            try {
-                Cal45SystemAccount.enroll(this, vault.server(), vault.username())
-            } catch (_: Exception) {
-                // Re-enrollment remains possible by testing the DAV login again.
-            }
-        }
+        // Only a successful user-initiated DAV login may create a system account.
+        // Never silently re-add an account removed through Android Settings.
         val scroll = ScrollView(this).apply { setBackgroundColor(navy) }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
