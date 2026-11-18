@@ -69,7 +69,7 @@ class MainActivity : Activity() {
         }
         root.addView(panelView, LinearLayout.LayoutParams(-1, -2))
         panelView.addView(text("Cal45-Konto verbinden", 22f, light, true))
-        panelView.addView(text("DAV-Server und Zugangsdaten prüfen. Synchronisierung folgt in einer späteren Version.", 14f, muted).apply {
+        panelView.addView(text("Nur HTTPS-Domainnamen und separate Cal45-App-Passwörter (cal45_…). Keine IP-Adressen und kein Kontopasswort.", 14f, muted).apply {
             setPadding(0, dp(8), 0, dp(20))
         })
 
@@ -89,7 +89,7 @@ class MainActivity : Activity() {
 
         val server = field("https://cal45.example.com/", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI)
         val username = field("Benutzername", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_NORMAL)
-        val appPassword = field("App-Passwort", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
+        val appPassword = field("Cal45-App-Passwort (cal45_…)", InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD)
         appPassword.setTextIsSelectable(false)
         server.setText(vault.server())
         username.setText(vault.username())
@@ -110,12 +110,12 @@ class MainActivity : Activity() {
             val url = server.text.toString().trim()
             val user = username.text.toString().trim()
             val password = appPassword.text.toString()
-            if (DavProbe.normalizedUrl(url) == null || user.isBlank() || password.isBlank()) {
-                status.text = "Bitte gültige HTTPS-Adresse, Benutzername und App-Passwort eingeben."
+            if (DavProbe.normalizedUrl(url) == null || user.isBlank() || !DavProbe.looksLikeAppPassword(password)) {
+                status.text = "Nur HTTPS-Domain, Benutzername und Cal45-App-Passwort (cal45_…) zulässig."
                 return@setOnClickListener
             }
             check.isEnabled = false
-            status.text = "DAV-Anmeldung wird geprüft …"
+            status.text = "Cal45-App-Passwort wird über HTTPS geprüft …"
             thread {
                 val result = DavProbe.check(url, user, password)
                 val message = if (result.successful) {
@@ -152,9 +152,9 @@ class MainActivity : Activity() {
             setPadding(0, dp(30), 0, dp(14))
         })
         root.addView(text("✓  Native Android-App ohne Google Play Services\n\n" +
-            "✓  HTTPS-DAV-Authentifizierungsprüfung\n\n" +
-            "✓  Verschlüsselte App-Passwort-Speicherung (Android Keystore)\n\n" +
-            "○  Android-Systemkonto: noch offen\n\n" +
+            "✓  HTTPS-DAV-Prüfung nur mit Domainnamen\n\n" +
+            "✓  Lokale Token-Formatprüfung und Android-Keystore-Speicherung\n\n" +
+            "○  Serverseitige App-Passwort-Erkennung: noch offen\\n\\n" +\n            "○  Android-Systemkonto: noch offen\n\n" +
             "○  Kontakte-Synchronisierung: noch offen\n\n" +
             "○  Kalender-Synchronisierung: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {

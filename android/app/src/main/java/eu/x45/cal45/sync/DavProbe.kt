@@ -22,25 +22,51 @@ object DavProbe {
         .callTimeout(12, TimeUnit.SECONDS)
         .build()
 
+    /**
+     * Only DNS names are permitted. Raw IPv4/IPv6 literals, single-label names,
+     * localhost, and numeric TLDs are rejected without resolving DNS.
+     */
+    private fun isDomain(host: String): Boolean {
+        if (host.length > 253 || !host.contains('.') || host.endsWith('.')) return false
+        if (host.contains(':') || host.startsWith('[') || host.endsWith(']')) return false
+        if (host.equals("localhost", ignoreCase = true)) return false
+        val labels = host.split('.')
+        if (labels.any { label ->
+            label.isEmpty() || label.length > 63 ||
+                !label.first().isLetterOrDigit() || !label.last().isLetterOrDigit() ||
+                !label.all { it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' }
+        }) return false
+        // Requires alphabetic characters in the top-level domain: rejects 192.0.2.1.
+        val tld = labels.last()
+        return tld.length >= 2 && tld.any { it.isLetter() }
+    }
+
     fun normalizedUrl(input: String): String? {
         val uri = try { URI(input.trim()) } catch (_: Exception) { return null }
-        if (!uri.scheme.equals("https", true) || uri.host.isNullOrBlank() ||
+        val host = uri.host ?: return null
+        if (!uri.scheme.equals("https", ignoreCase = true) || !isDomain(host) ||
             uri.rawUserInfo != null || uri.rawQuery != null || uri.rawFragment != null ||
             uri.port !in -1..65535 || uri.port == 0) return null
         val path = uri.rawPath?.takeIf { it.isNotEmpty() } ?: "/"
-        if (!path.startsWith("/") || path.contains("//") || path.contains("/../") ||
-            path.contains("/./")) return null
+        if (!path.startsWith("/") || path.contains("//") ||
+            path.split('/').any { it == "." || it == ".." }) return null
         return try {
-            URI("https", null, uri.host, uri.port, path, null, null).toASCIIString()
+            URI("https", null, host.lowercase(java.util.Locale.ROOT), uri.port, path, null, null)
+                .toASCIIString()
         } catch (_: Exception) { null }
     }
 
+    /** Cal45 device-token format, not proof that the server rejected a user password. */
+    fun looksLikeAppPassword(value: String): Boolean =
+        value.startsWith("cal45_") && value.length >= 32 &&
+            value.length <= 256 && value.all { it.isLetterOrDigit() || it == '_' || it == '-' }
+
     fun check(serverUrl: String, username: String, appPassword: String): Result {
         if (username.isBlank() || username.contains(':') || username.any { it.isISOControl() } ||
-            appPassword.isBlank()) {
-            return Result(false, "Benutzername oder App-Passwort ungültig.")
+            !looksLikeAppPassword(appPassword)) {
+            return Result(false, "Benutzername ungültig oder kein Cal45-App-Passwort (cal45_…).")
         }
-        val url = normalizedUrl(serverUrl) ?: return Result(false, "Nur gültige HTTPS-Adressen sind erlaubt.")
+        val url = normalizedUrl(serverUrl) ?: return Result(false, "Nur HTTPS-Adressen mit Domainnamen sind erlaubt (keine IP-Adressen).")
         return try {
             val token = Base64.encodeToString(
                 "$username:$appPassword".toByteArray(Charsets.UTF_8), Base64.NO_WRAP
