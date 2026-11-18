@@ -28,7 +28,19 @@ type deviceToken struct {
  Revoked bool `json:"revoked"`
  Created string `json:"created"`
 }
-type tokenStore struct { Tokens []deviceToken `json:"tokens"` }
+type account struct {
+ Username string `json:"username"`
+ Active bool `json:"active"`
+ Created string `json:"created"`
+}
+type tokenStore struct {
+ Accounts []account `json:"accounts"`
+ Tokens []deviceToken `json:"tokens"`
+}
+func activeAccount(db tokenStore, username string) bool {
+ for _,a:=range db.Accounts { if a.Username==username {return a.Active} }
+ return false
+}
 func tokenPath() string {
  if s:=os.Getenv("CAL45_TOKEN_FILE");s!="" {return s}
  return "/var/lib/cal45/tokens.json"
@@ -84,7 +96,8 @@ func tokenCLI(args []string) error {
   id,err:=randomToken(9);if err!=nil{return err}
   token:="cal45_"+random
   entry:=deviceToken{ID:id,Username:args[1],Label:args[2],SHA256:tokenHash(token),Created:time.Now().UTC().Format(time.RFC3339)}
-  if err:=updateStore(tokenPath(),func(db *tokenStore)error{db.Tokens=append(db.Tokens,entry);return nil});err!=nil{return err}
+  if err:=updateStore(tokenPath(),func(db *tokenStore)error{if !activeAccount(*db,args[1]) {return fmt.Errorf("active account not found: provision first with account add")} 
+   db.Tokens=append(db.Tokens,entry);return nil});err!=nil{return err}
   fmt.Printf("Token-ID: %s\nBenutzer: %s\nApp-Passwort (einmalig): %s\n",id,args[1],token)
  case "list":
   if len(args)!=1{return fmt.Errorf("use token list")}
@@ -104,6 +117,7 @@ func verifyToken(path,user,token string) bool {
  if !allowedUsername(user)||!strings.HasPrefix(token,"cal45_")||len(token)>256{return false}
  db,err:=readStore(path)
  if err!=nil {log.Printf("token store unavailable: %v",err);return false}
+ if !activeAccount(db,user) {return false}
  sum:=sha256.Sum256([]byte(token))
  for _,t:=range db.Tokens {
   expected,err:=hex.DecodeString(t.SHA256)
