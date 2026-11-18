@@ -28,6 +28,7 @@ import kotlin.concurrent.thread
 class MainActivity : AccountAuthenticatorActivity() {
     private val contactsPermissionRequest = 4501
     private val calendarPermissionRequest = 4502
+    private val backgroundPermissionRequest = 4503
 
     private fun importContactsNow() {
         val vault = CredentialVault(this)
@@ -69,6 +70,12 @@ class MainActivity : AccountAuthenticatorActivity() {
         when (requestCode) {
             contactsPermissionRequest -> importContactsNow()
             calendarPermissionRequest -> importCalendarNow()
+            backgroundPermissionRequest -> {
+                val enabled = Cal45BackgroundSync.enable(this)
+                android.widget.Toast.makeText(this,
+                    if (enabled) "Cal45-Hintergrundimport aktiviert." else "Hintergrundimport nicht möglich. Android-Kontosynchronisierung prüfen.",
+                    android.widget.Toast.LENGTH_LONG).show()
+            }
         }
     }
 
@@ -275,6 +282,61 @@ class MainActivity : AccountAuthenticatorActivity() {
                 ?: "Noch kein abgeschlossener Kalenderimport vorhanden."
         }
 
+        val scheduleTitle = text("Hintergrundimport", 19f, light, true).apply {
+            setPadding(0, dp(24), 0, dp(8))
+        }
+        panelView.addView(scheduleTitle)
+        panelView.addView(text(
+            "Optional: Android versucht etwa alle 6 Stunden neue Cal45-Kontakte und einfache Termine zu importieren. Keine Uploads oder Löschungen.",
+            13f, muted
+        ))
+        val enableBackground = Button(this).apply {
+            text = "Automatischen Import aktivieren"
+            isAllCaps = false
+            setTextColor(navy)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(accent)
+        }
+        panelView.addView(enableBackground)
+        enableBackground.setOnClickListener {
+            val permissions = arrayOf(
+                Manifest.permission.READ_CONTACTS, Manifest.permission.WRITE_CONTACTS,
+                Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR
+            )
+            if (Cal45BackgroundSync.account(this) == null) {
+                status.text = "Zuerst das Cal45-Systemkonto mit einem App-Passwort verbinden."
+            } else if (permissions.any { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }) {
+                status.text = "Für den automatischen Import sind Kontakte- und Kalenderberechtigungen nötig."
+                requestPermissions(permissions, backgroundPermissionRequest)
+            } else if (Cal45BackgroundSync.enable(this)) {
+                status.text = "Automatischer Import eingerichtet. Android bestimmt den tatsächlichen Zeitpunkt."
+            } else {
+                status.text = "Automatischer Import nicht möglich. Globale Android-Synchronisierung prüfen."
+            }
+        }
+        val disableBackground = Button(this).apply {
+            text = "Automatischen Import ausschalten"
+            isAllCaps = false
+            setTextColor(light)
+        }
+        panelView.addView(disableBackground)
+        disableBackground.setOnClickListener {
+            Cal45BackgroundSync.disable(this)
+            status.text = "Automatischer Cal45-Import deaktiviert."
+        }
+        val scheduleStatus = Button(this).apply {
+            text = "Hintergrundimport-Status prüfen"
+            isAllCaps = false
+            setTextColor(light)
+        }
+        panelView.addView(scheduleStatus)
+        scheduleStatus.setOnClickListener {
+            status.text = if (Cal45BackgroundSync.enabled(this)) {
+                "Der Cal45-Hintergrundimport ist für Kontakte und Kalender aktiviert."
+            } else {
+                "Automatischer Import ist nicht aktiv oder wurde in den Android-Einstellungen deaktiviert."
+            }
+        }
+
         val forget = Button(this).apply {
             text = "Gespeichertes Konto entfernen"
             isAllCaps = false
@@ -301,6 +363,7 @@ class MainActivity : AccountAuthenticatorActivity() {
             "✓  CardDAV-Kontakte: manueller, nur lesender Erstimport\n\n" +
             "○  Abgleich geänderter/gelöschter Kontakte: noch offen\n\n" +
             "✓  CalDAV-Termine: manueller Import einfacher Einzeltermine\n\n" +
+            "✓  Optionaler Hintergrundimport (systemgesteuert)\n\n" +
             "○  Vollständiger bidirektionaler Abgleich: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
             gravity = Gravity.CENTER
