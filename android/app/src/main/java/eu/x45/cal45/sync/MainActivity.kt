@@ -2,12 +2,10 @@ package eu.x45.cal45.sync
 
 import android.accounts.AccountAuthenticatorActivity
 import android.accounts.AccountManager
-import android.accounts.Account
 import android.Manifest
 import android.content.ContentResolver
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
-import android.os.Build
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -234,8 +232,8 @@ class MainActivity : AccountAuthenticatorActivity() {
             "✓  HTTPS-DAV-Prüfung nur mit Domainnamen\n\n" +
             "✓  Lokale Token-Formatprüfung und Android-Keystore-Speicherung\n\n" +
             "✓  Serverseitige App-Passwort-Prüfung über Cal45-Gateway\n\n" +
-            "✓  Android-Systemkonto (ohne SyncAdapter)\n\n" +
-            "✓  CardDAV-Kontakte: manueller, nur lesender Erstimport\\n\\n" +
+            "✓  Android-Systemkonto und Kontakte-SyncAdapter\n\n" +
+            "✓  CardDAV-Kontakte: manueller, nur lesender Erstimport\n\n" +
             "○  Abgleich geänderter/gelöschter Kontakte: noch offen\n\n" +
             "○  Kalender-Synchronisierung: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
