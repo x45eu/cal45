@@ -3,6 +3,8 @@ package eu.x45.cal45.sync
 import android.accounts.Account
 import android.accounts.AccountManager
 import android.content.Context
+import android.content.ContentResolver
+import android.provider.ContactsContract
 import android.os.Bundle
 import java.net.URI
 import java.util.Locale
@@ -18,7 +20,7 @@ import java.util.Locale
 object Cal45SystemAccount {
     const val TYPE = "eu.x45.cal45.sync"
 
-    private fun name(server: String, username: String): String {
+    fun accountName(server: String, username: String): String {
         val host = URI(server).host.lowercase(Locale.ROOT)
         return "$username@$host"
     }
@@ -27,7 +29,7 @@ object Cal45SystemAccount {
         require(DavProbe.normalizedUrl(server) != null) { "Ungültige Cal45-Adresse" }
         require(username.isNotBlank()) { "Benutzername fehlt" }
         val manager = AccountManager.get(context)
-        val account = Account(name(server, username), TYPE)
+        val account = Account(accountName(server, username), TYPE)
         // One system account only until multi-account credential storage exists.
         for (existing in manager.getAccountsByType(TYPE)) {
             if (existing.name != account.name) manager.removeAccountExplicitly(existing)
@@ -40,6 +42,8 @@ object Cal45SystemAccount {
         } else {
             manager.setUserData(account, "server", server)
         }
+        ContentResolver.setIsSyncable(account, ContactsContract.AUTHORITY, 1)
+        ContentResolver.setSyncAutomatically(account, ContactsContract.AUTHORITY, false)
         return account
     }
 
