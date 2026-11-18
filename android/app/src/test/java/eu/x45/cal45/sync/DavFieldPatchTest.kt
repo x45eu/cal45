@@ -113,4 +113,24 @@ class DavFieldPatchTest {
         assertEquals(1, result.changedLines)
     }
 
+    @Test fun rejectsUnsupportedRecurrenceExceptionsAndOverlongUtf8() {
+        val base = "BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\n" +
+            "UID:test\nSUMMARY:Meeting\nDTSTART:20261119T130000Z\n" +
+            "DTEND:20261119T140000Z\nEND:VEVENT\nEND:VCALENDAR\n"
+        for (property in listOf(
+            "RECURRENCE-ID:20261119T130000Z",
+            "EXDATE:20261120T130000Z",
+            "RDATE:20261120T130000Z",
+            "DURATION:PT1H",
+            "STATUS:CANCELLED"
+        )) rejected(DavFieldPatch.prepare(
+            base.replace("END:VEVENT", property + "\nEND:VEVENT"),
+            DavFieldPatch.Target.EVENT_TITLE, "Meeting", "Changed"
+        ))
+        rejected(DavFieldPatch.prepare(
+            base, DavFieldPatch.Target.EVENT_TITLE,
+            "Meeting", "Ä".repeat(50)
+        ))
+    }
+
 }
