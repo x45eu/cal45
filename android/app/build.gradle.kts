@@ -6,6 +6,7 @@ plugins {
 dependencies {
     // HTTP client supports WebDAV extensions such as PROPFIND.
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    testImplementation("junit:junit:4.13.2")
 }
 android {
     namespace = "eu.x45.cal45.sync"
@@ -15,8 +16,8 @@ android {
         applicationId = "eu.x45.cal45.sync"
         minSdk = 29
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "0.4.0"
     }
     buildTypes {
         release {

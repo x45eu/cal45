@@ -39,6 +39,8 @@ jobs:
           test -x "$SDKMGR"
           yes | "$SDKMGR" --licenses >/dev/null || true
           "$SDKMGR" "platforms;android-35" "build-tools;35.0.0"
+      - name: Run vCard parser unit tests
+        run: gradle --no-daemon :app:testDebugUnitTest
       - name: Build debug APK
         run: gradle --no-daemon :app:assembleDebug
       - name: Upload APK
