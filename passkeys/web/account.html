@@ -16,7 +16,22 @@
 <p id="status" role="status" aria-live="polite">Deine Sitzung wird geprüft …</p>
 <p id="username"></p>
 <button type="button" id="logout" disabled>Abmelden</button>
-<p>Die Gerätepasswortverwaltung wird erst nach zusätzlichen Sicherheitsprüfungen freigeschaltet.</p>
+
+</section>
+<section aria-labelledby="device-heading">
+<h2 id="device-heading">Gerätepasswörter</h2>
+<p>Jedes Gerät erhält ein eigenes App-Passwort. Das normale Kontopasswort wird nicht für DAV verwendet. Für Änderungen ist eine Passkey-Anmeldung der letzten fünf Minuten erforderlich.</p>
+<label for="device-label">Gerätename</label>
+<input type="text" id="device-label" maxlength="80" placeholder="z. B. Pixel 9a" autocomplete="off">
+<button type="button" id="create-device" disabled>Neues App-Passwort erstellen</button>
+<p id="device-message" role="status" aria-live="polite"></p>
+<div id="issued-device" hidden>
+<label for="issued-password">Einmaliges App-Passwort – jetzt sicher übernehmen</label>
+<input type="text" id="issued-password" readonly autocomplete="off" spellcheck="false">
+<button type="button" id="copy-password">Passwort kopieren</button>
+</div>
+<h2>Deine Geräte</h2>
+<ul id="device-list" aria-live="polite"></ul>
 </section>
 <footer>Bereitgestellt von Cal45</footer>
 </main>
