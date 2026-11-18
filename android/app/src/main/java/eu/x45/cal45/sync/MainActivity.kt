@@ -6,6 +6,7 @@ import android.Manifest
 import android.content.ContentResolver
 import android.content.pm.PackageManager
 import android.provider.ContactsContract
+import android.provider.CalendarContract
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
@@ -20,12 +21,13 @@ import android.widget.TextView
 import kotlin.concurrent.thread
 
 /**
- * Cal45 Sync credential enrollment, no calendar/contact sync yet.
+ * Cal45 Sync account enrollment and manual, import-only DAV SyncAdapters.
  * Requires separate Cal45 device app passwords and HTTPS DNS server URLs.
- * Registers an Android system account but does not sync contacts/calendars yet.
+ * Initial CardDAV and CalDAV imports never upload, update or delete records.
  */
 class MainActivity : AccountAuthenticatorActivity() {
     private val contactsPermissionRequest = 4501
+    private val calendarPermissionRequest = 4502
 
     private fun importContactsNow() {
         val vault = CredentialVault(this)
@@ -43,13 +45,30 @@ class MainActivity : AccountAuthenticatorActivity() {
         })
     }
 
+    private fun importCalendarNow() {
+        val vault = CredentialVault(this)
+        val server = vault.server()
+        val user = vault.username()
+        if (!vault.configured() || DavProbe.normalizedUrl(server) == null ||
+            vault.readAppPassword() == null) return
+        val name = Cal45SystemAccount.accountName(server, user)
+        val account = AccountManager.get(this).getAccountsByType(Cal45SystemAccount.TYPE)
+            .firstOrNull { it.name == name } ?: return
+        ContentResolver.setIsSyncable(account, CalendarContract.AUTHORITY, 1)
+        ContentResolver.requestSync(account, CalendarContract.AUTHORITY, Bundle().apply {
+            putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true)
+            putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true)
+        })
+    }
+
     override fun onRequestPermissionsResult(
         requestCode: Int, permissions: Array<out String>, grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == contactsPermissionRequest &&
-            grantResults.isNotEmpty() && grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
-            importContactsNow()
+        if (grantResults.isEmpty() || !grantResults.all { it == PackageManager.PERMISSION_GRANTED }) return
+        when (requestCode) {
+            contactsPermissionRequest -> importContactsNow()
+            calendarPermissionRequest -> importCalendarNow()
         }
     }
 
@@ -222,6 +241,40 @@ class MainActivity : AccountAuthenticatorActivity() {
                 ?: "Es liegt noch kein abgeschlossener Kontakte-Import vor."
         }
 
+        val calendarImport = Button(this).apply {
+            text = "Termine aus Cal45 importieren (nur lesend)"
+            isAllCaps = false
+            setTextColor(navy)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(accent)
+        }
+        panelView.addView(calendarImport)
+        calendarImport.setOnClickListener {
+            if (!CredentialVault(this).configured()) {
+                status.text = "Bitte zuerst den Cal45-DAV-Zugang prüfen und speichern."
+                return@setOnClickListener
+            }
+            val required = arrayOf(Manifest.permission.READ_CALENDAR, Manifest.permission.WRITE_CALENDAR)
+            if (required.any { checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED }) {
+                status.text = "Android benötigt die Kalenderberechtigung für den Terminimport."
+                requestPermissions(required, calendarPermissionRequest)
+            } else {
+                importCalendarNow()
+                status.text = "Kalenderimport angefordert. Den Abschluss anschließend prüfen."
+            }
+        }
+
+        val calendarResult = Button(this).apply {
+            text = "Letzten Kalender-Import prüfen"
+            isAllCaps = false
+            setTextColor(light)
+        }
+        panelView.addView(calendarResult)
+        calendarResult.setOnClickListener {
+            val prefs = getSharedPreferences("cal45_calendar_sync_status", MODE_PRIVATE)
+            status.text = prefs.getString("message", null)
+                ?: "Noch kein abgeschlossener Kalenderimport vorhanden."
+        }
+
         val forget = Button(this).apply {
             text = "Gespeichertes Konto entfernen"
             isAllCaps = false
@@ -247,7 +300,8 @@ class MainActivity : AccountAuthenticatorActivity() {
             "✓  Android-Systemkonto und Kontakte-SyncAdapter\n\n" +
             "✓  CardDAV-Kontakte: manueller, nur lesender Erstimport\n\n" +
             "○  Abgleich geänderter/gelöschter Kontakte: noch offen\n\n" +
-            "○  Kalender-Synchronisierung: noch offen", 15f, muted))
+            "✓  CalDAV-Termine: manueller Import einfacher Einzeltermine\n\n" +
+            "○  Vollständiger bidirektionaler Abgleich: noch offen", 15f, muted))
         root.addView(text("Bereitgestellt von Cal45", 12f, muted).apply {
             gravity = Gravity.CENTER
             setPadding(0, dp(38), 0, 0)
