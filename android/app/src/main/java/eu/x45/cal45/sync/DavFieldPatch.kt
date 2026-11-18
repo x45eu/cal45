@@ -93,8 +93,8 @@ internal object DavFieldPatch {
     ): Result {
         if (original.length > 256 * 1024 || original.isEmpty() ||
             original.contains('\u0000') ||
-            original.contains(Regex("(?i)(?:^|[\r\n])(?:BEGIN|END):"))
-                .not()) return Result.Rejected("Invalid document")
+            !original.contains("BEGIN:", ignoreCase = true))
+            return Result.Rejected("Invalid document")
         if (!plainText(expectedOldValue) || !plainText(newValue))
             return Result.Rejected("Unsupported text")
         val lines = splitLines(original) ?: return Result.Rejected("Too many lines")
@@ -108,7 +108,7 @@ internal object DavFieldPatch {
 
         // Only one top-level object, one target component, no nested events,
         // no folded target property (continuations would otherwise be lost).
-        var depth = 0
+        val stack = ArrayList<String>()
         var outerCount = 0
         var innerCount = 0
         var insideTarget = false
@@ -117,34 +117,31 @@ internal object DavFieldPatch {
             val value = line.content
             if (value.startsWith("BEGIN:", ignoreCase = true)) {
                 val component = value.substringAfter(':')
-                if (depth == 0) {
+                if (stack.isEmpty()) {
                     if (!component.equals(target.outer, true) || outerCount++ != 0)
                         return Result.Rejected("Multiple document roots")
-                } else if (target.inner != null && depth == 1 &&
+                } else if (target.inner != null && stack.size == 1 &&
                     component.equals(target.inner, true)) {
                     innerCount++
                     if (innerCount > 1) return Result.Rejected("Multiple events")
                     insideTarget = true
-                } else if (target.inner == null && depth == 1) {
+                } else if (target.inner == null && stack.size == 1) {
                     return Result.Rejected("Nested vCard content")
                 }
-                depth++
+                if (stack.size >= 8) return Result.Rejected("Component nesting too deep")
+                stack.add(component.uppercase())
                 continue
             }
             if (value.startsWith("END:", ignoreCase = true)) {
-                depth--
-                if (depth < 0) return Result.Rejected("Unbalanced document")
-                if (target.inner != null && depth == 1 && insideTarget &&
-                    value.substringAfter(':').equals(target.inner, true)) {
-                    insideTarget = false
-                } else if (target.inner == null && depth == 0 &&
-                    !value.substringAfter(':').equals(target.outer, true)) {
-                    return Result.Rejected("Invalid root closure")
-                }
+                val component = value.substringAfter(':').uppercase()
+                if (stack.isEmpty() || stack.removeAt(stack.lastIndex) != component)
+                    return Result.Rejected("Unbalanced component names")
+                if (target.inner != null && stack.size == 1 && insideTarget &&
+                    component.equals(target.inner, true)) insideTarget = false
                 continue
             }
-            val atTarget = if (target.inner == null) depth == 1 else
-                depth == 2 && insideTarget
+            val atTarget = if (target.inner == null) stack.size == 1 else
+                stack.size == 2 && insideTarget
             if (!atTarget) continue
             val colon = value.indexOf(':')
             if (colon < 0) continue
@@ -166,7 +163,8 @@ internal object DavFieldPatch {
             if (target.inner != null && field.equals("RRULE", true))
                 return Result.Rejected("Recurring event")
         }
-        if (depth != 0 || outerCount != 1 || (target.inner != null && innerCount != 1))
+        if (stack.isNotEmpty() || outerCount != 1 ||
+            (target.inner != null && innerCount != 1))
             return Result.Rejected("Unbalanced components")
         if (targetIndex < 0) return Result.Rejected("Required property missing")
         val current = lines[targetIndex].content.substringAfter(':')
