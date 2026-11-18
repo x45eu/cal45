@@ -22,6 +22,7 @@ jobs:
       - run: go test -mod=readonly -race ./...
       - run: go vet -mod=readonly ./...
       - run: go build -mod=readonly ./cmd/cal45-passkey-bootstrap
+      - run: go build -mod=readonly ./cmd/cal45-auth-server
       - name: Check browser WebAuthn script syntax
         working-directory: passkeys/web
         run: |
