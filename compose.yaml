@@ -10,9 +10,9 @@ services:
       - no-new-privileges:true
     cap_drop: [ALL]
     ports:
-      # LAN-IP des Debian-Servers; NetBird-Reverse-Proxy erreicht sie
-      # ueber den OPNsense-Routing-Peer.
-      - "10.10.34.32:5232:5232"
+      # IP und Port kommen aus der .env (siehe .env.example).
+      # Default 127.0.0.1 = nur lokal erreichbar, falls keine .env existiert.
+      - "${CAL45_BIND_IP:-127.0.0.1}:${CAL45_PORT:-5232}:5232"
     volumes:
       - ./config:/etc/radicale:ro
       - ./data:/var/lib/radicale
